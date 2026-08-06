@@ -1,0 +1,35 @@
+﻿@{
+    ViewData["Title"] = "註冊成功";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 text-center">
+            <div class="card shadow">
+                <div class="card-body py-5">
+
+                    <h1>📧</h1>
+                    <h3 class="text-success mt-3">註冊成功！</h3>
+
+                    @* TempData 是「一次性訊息」，顯示一次後就消失 *@
+                    @* 用來從 Controller 帶訊息給 View 顯示 *@
+                    @if (TempData["Message"] != null)
+                    {
+                        <p class="text-muted mt-3">@TempData["Message"]</p>
+                    }
+
+                    <div class="alert alert-info mt-4">
+                        <strong>📬 請去收信！</strong><br />
+                        點擊信件中的驗證連結後，即可登入使用。
+                    </div>
+
+                    <a asp-action="Login" asp-controller="Account"
+                       class="btn btn-warning mt-3 px-5 fw-bold">
+                        前往登入
+                    </a>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

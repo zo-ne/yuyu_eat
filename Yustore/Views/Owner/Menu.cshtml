@@ -1,0 +1,80 @@
+﻿@model List<Yustore.Models.Entities.MenuItem>
+@{
+    ViewData["Title"] = "菜單管理";
+}
+
+<div class="container mt-4">
+
+    @if (TempData["Message"] != null)
+    {
+        <div class="alert alert-success">@TempData["Message"]</div>
+    }
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>🍜 菜單管理</h3>
+        <a asp-action="CreateMenuItem" class="btn btn-warning fw-bold">
+            ＋ 新增餐點
+        </a>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="alert alert-info">
+            還沒有任何餐點，點右上角新增第一道菜吧！
+        </div>
+    }
+    else
+    {
+        <div class="row g-3">
+            @foreach (var item in Model)
+            {
+                <div class="col-md-4">
+                    <div class="card h-100 @(!item.IsAvailable ? "opacity-50" : "")">
+                        @* 餐點圖片 *@
+                        @if (!string.IsNullOrEmpty(item.ImageUrl))
+                        {
+                            <img src="@item.ImageUrl" class="card-img-top"
+                                 style="height:180px;object-fit:cover;" />
+                        }
+                        else
+                        {
+                            <div class="bg-light d-flex align-items-center justify-content-center"
+                                 style="height:180px;">
+                                <span class="text-muted">無圖片</span>
+                            </div>
+                        }
+
+                        <div class="card-body">
+                            <h5 class="card-title">@item.Name</h5>
+                            <p class="text-muted small">@item.Description</p>
+                            <h6 class="text-warning fw-bold">$@item.Price</h6>
+                            @if (!item.IsAvailable)
+                            {
+                                <span class="badge bg-secondary">已停售</span>
+                            }
+                        </div>
+
+                        <div class="card-footer d-flex gap-2">
+                            <a asp-action="EditMenuItem" asp-route-id="@item.Id"
+                               class="btn btn-sm btn-outline-warning flex-fill">
+                                編輯
+                            </a>
+                            <form asp-action="DeleteMenuItem" method="post" class="flex-fill"
+                                  onsubmit="return confirm('確定刪除「@item.Name」？')">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@item.Id" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger w-100">
+                                    刪除
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <div class="mt-4">
+        <a asp-action="Index" class="btn btn-outline-secondary">← 回後台首頁</a>
+    </div>
+</div>

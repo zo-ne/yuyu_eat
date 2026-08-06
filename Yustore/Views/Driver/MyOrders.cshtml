@@ -1,0 +1,99 @@
+﻿@model List<Yustore.Models.Entities.Delivery>
+@using Yustore.Enums
+@{
+    ViewData["Title"] = "我的訂單";
+}
+
+<div class="container mt-4">
+
+    @if (TempData["Message"] != null)
+    {
+        <div class="alert alert-success">@TempData["Message"]</div>
+    }
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>📋 我的訂單記錄</h3>
+        <a asp-action="Index" class="btn btn-outline-secondary">← 回後台</a>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="alert alert-info text-center py-4">
+            還沒有接過任何訂單。
+        </div>
+    }
+    else
+    {
+        @foreach (var delivery in Model)
+        {
+            <div class="card mb-3 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong>@delivery.Order.OrderNumber</strong>
+                            <span class="ms-2 badge @GetBadge(delivery.Order.Status)">
+                                @delivery.Order.Status
+                            </span>
+                        </div>
+                        <span class="text-warning fw-bold">
+                            $@delivery.Order.GrandTotal
+                        </span>
+                    </div>
+
+                    <p class="mb-1 mt-2">
+                        🏪 @delivery.Order.Restaurant?.Name
+                    </p>
+                    <p class="mb-1">
+                        📍 @delivery.Order.DeliveryAddress
+                    </p>
+                    <p class="mb-2 text-muted small">
+                        接單時間：@delivery.PickedUpAt?.ToString("yyyy/MM/dd HH:mm")
+                    </p>
+
+                    @* 完成照片 *@
+                    @if (!string.IsNullOrEmpty(delivery.ProofPhotoUrl))
+                    {
+                        <div class="mb-2">
+                            <small class="text-muted">送達照片：</small><br />
+                            <img src="@delivery.ProofPhotoUrl" class="rounded mt-1"
+                                 style="max-height:100px;" />
+                        </div>
+                    }
+
+                    @* 如果還沒完成，顯示完成按鈕 *@
+                    @if (delivery.DeliveredAt == null)
+                    {
+                        <a asp-action="CompleteOrder"
+                           asp-route-deliveryId="@delivery.Id"
+                           class="btn btn-success btn-sm">
+                            ✅ 完成送達（上傳照片）
+                        </a>
+                    }
+                    else
+                    {
+                        <small class="text-success">
+                            ✅ 送達時間：@delivery.DeliveredAt?.ToString("yyyy/MM/dd HH:mm")
+                        </small>
+
+                        <a asp-controller="Review"
+                           asp-action="OrderReviews"
+                           asp-route-orderId="@delivery.Order.Id"
+                           class="btn btn-warning btn-sm">
+                            ⭐ 評分
+                        </a>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@functions {
+    string GetBadge(Yustore.Enums.OrderStatus status) => status switch
+    {
+        OrderStatus.外送中 => "bg-warning text-dark",
+        OrderStatus.已送達 => "bg-success",
+        OrderStatus.完成 => "bg-success",
+        _ => "bg-secondary"
+    };
+}

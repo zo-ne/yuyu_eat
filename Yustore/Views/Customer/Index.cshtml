@@ -1,0 +1,94 @@
+﻿@model List<Yustore.Models.Entities.Restaurant>
+@{
+    ViewData["Title"] = "探索店家";
+}
+
+<div class="container mt-4">
+
+    @if (TempData["Message"] != null)
+    {
+        <div class="alert alert-success">@TempData["Message"]</div>
+    }
+
+    <h3 class="mb-4">🍱 探索店家</h3>
+
+    @* 搜尋列 *@
+    <form asp-action="Index" method="get" class="mb-4">
+        <div class="input-group">
+            <input type="text" name="search" class="form-control form-control-lg"
+                   placeholder="搜尋店家名稱或描述..."
+                   value="@ViewBag.Search" />
+            <button type="submit" class="btn btn-warning px-4">
+                🔍 搜尋
+            </button>
+            @if (!string.IsNullOrEmpty(ViewBag.Search as string))
+            {
+                <a asp-action="Index" class="btn btn-outline-secondary">清除</a>
+            }
+        </div>
+    </form>
+
+    @if (!Model.Any())
+    {
+        <div class="alert alert-info">
+            @if (!string.IsNullOrEmpty(ViewBag.Search as string))
+            {
+                <span>找不到「@ViewBag.Search」相關的店家。</span>
+            }
+            else
+            {
+                <span>目前還沒有店家。</span>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            @foreach (var restaurant in Model)
+            {
+                <div class="col-md-4">
+                    <a asp-action="Restaurant" asp-route-id="@restaurant.Id"
+                       class="text-decoration-none">
+                        <div class="card h-100 shadow-sm hover-card">
+                            @if (!string.IsNullOrEmpty(restaurant.LogoUrl))
+                            {
+                                <img src="@restaurant.LogoUrl" class="card-img-top"
+                                     style="height:200px;object-fit:cover;" />
+                            }
+                            else
+                            {
+                                <div class="bg-warning d-flex align-items-center
+                                            justify-content-center"
+                                     style="height:200px;">
+                                    <span style="font-size:4rem;">🍱</span>
+                                </div>
+                            }
+                            <div class="card-body">
+                                <h5 class="card-title text-dark">@restaurant.Name</h5>
+                                <p class="text-muted small">@restaurant.Description</p>
+                                <p class="text-muted small mb-0">
+                                    📍 @restaurant.Address
+                                </p>
+                            </div>
+                            <div class="card-footer bg-transparent">
+                                <span class="btn btn-warning btn-sm w-100">
+                                    查看菜單 →
+                                </span>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .hover-card {
+        transition: transform 0.2s;
+    }
+
+        .hover-card:hover {
+            transform: translateY(-5px);
+        }
+</style>

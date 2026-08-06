@@ -1,0 +1,106 @@
+﻿@model Yustore.ViewModels.ReviewViewModel
+@{
+    ViewData["Title"] = "給予評分";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-warning text-white text-center">
+                    <h4>⭐ 給予評分</h4>
+                </div>
+                <div class="card-body">
+
+                    <div class="text-center mb-4">
+                        <h5>你正在評分</h5>
+                        <h3>@Model.TargetUserName</h3>
+                        <span class="badge bg-secondary">@Model.TargetType</span>
+                        <p class="text-muted small mt-1">
+                            訂單：@Model.OrderNumber
+                        </p>
+                    </div>
+
+                    <form asp-action="Create" method="post">
+                        @Html.AntiForgeryToken()
+
+                        @* 隱藏欄位傳遞必要資料 *@
+                        <input asp-for="OrderId" type="hidden" />
+                        <input asp-for="OrderNumber" type="hidden" />
+                        <input asp-for="TargetUserId" type="hidden" />
+                        <input asp-for="TargetUserName" type="hidden" />
+                        <input asp-for="TargetType" type="hidden" />
+
+                        @* 星等選擇（用互動式星星）*@
+                        <div class="mb-4 text-center">
+                            <label class="form-label fw-bold d-block mb-2">
+                                選擇星等
+                            </label>
+                            <div class="star-rating">
+                                @for (int i = 5; i >= 1; i--)
+                                {
+                                    <input type="radio" asp-for="Stars"
+                                           value="@i" id="star@(i)"
+                                           class="star-input" />
+                                    <label for="star@(i)" class="star-label">★</label>
+                                }
+                            </div>
+                            <span asp-validation-for="Stars" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-4">
+                            <label asp-for="Comment" class="form-label fw-bold">
+                            </label>
+                            <textarea asp-for="Comment" class="form-control" rows="3"
+                                      placeholder="分享你的評價...（選填）">
+                            </textarea>
+                            <span asp-validation-for="Comment" class="text-danger"></span>
+                        </div>
+
+                        <button type="submit" class="btn btn-warning w-100 fw-bold py-2">
+                            ⭐ 送出評分
+                        </button>
+                    </form>
+
+                    <a asp-action="OrderReviews"
+                       asp-route-orderId="@Model.OrderId"
+                       class="btn btn-outline-secondary w-100 mt-2">
+                        取消
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* 星星評分互動效果 */
+    .star-rating {
+        display: flex;
+        flex-direction: row-reverse;
+        justify-content: center;
+        gap: 5px;
+    }
+
+    .star-input {
+        display: none; /* 隱藏原本的 radio button */
+    }
+
+    .star-label {
+        font-size: 2.5rem;
+        color: #ddd;
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+
+        /* 選中的星星和之後的星星都變黃色 */
+        .star-input:checked ~ .star-label,
+        .star-label:hover,
+        .star-label:hover ~ .star-label {
+            color: #ffc107;
+        }
+</style>
+
+@section Scripts {
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+}

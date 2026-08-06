@@ -1,0 +1,56 @@
+﻿@{
+    ViewData["Title"] = "建立店家資料";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-7">
+            <div class="card shadow">
+                <div class="card-header bg-warning text-white">
+                    <h4>🍱 建立你的店家資料</h4>
+                </div>
+                <div class="card-body">
+                    <form asp-action="SetupRestaurant" asp-controller="Owner"
+                          method="post" enctype="multipart/form-data">
+                        @* enctype="multipart/form-data" 是上傳檔案必須加的 *@
+                        @Html.AntiForgeryToken()
+
+                        <div class="mb-3">
+                            <label class="form-label">店家名稱 *</label>
+                            <input name="Name" class="form-control" required
+                                   placeholder="例如：阿裕食堂" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">店家簡介</label>
+                            <textarea name="Description" class="form-control" rows="3"
+                                      placeholder="介紹一下你的店..."></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">地址</label>
+                            <input name="Address" class="form-control"
+                                   placeholder="例如：台南市東區..." />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">電話</label>
+                            <input name="Phone" class="form-control"
+                                   placeholder="例如：06-1234567" />
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">店家 Logo</label>
+                            <input name="logoFile" type="file" class="form-control"
+                                   accept="image/*" />
+                        </div>
+
+                        <button type="submit" class="btn btn-warning w-100 fw-bold">
+                            建立店家
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,102 @@
+﻿@model Yustore.ViewModels.RegisterViewModel
+@* @model 告訴這個頁面：「我要用 RegisterViewModel 的資料」 *@
+
+@{
+    ViewData["Title"] = "註冊";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-warning text-white text-center">
+                    <h3>🍱 加入阿裕食堂</h3>
+                </div>
+                <div class="card-body">
+
+                    @* asp-action：這個表單送到哪個 Action *@
+                    @* asp-controller：送到哪個 Controller *@
+                    @* method="post"：用 POST 方式送出 *@
+                    <form asp-action="Register" asp-controller="Account" method="post">
+
+                        @* 防止 CSRF 攻擊的隱藏 token，配合 [ValidateAntiForgeryToken] *@
+                        @Html.AntiForgeryToken()
+
+                        @* 顯示整體錯誤訊息 *@
+                        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                        <div class="mb-3">
+                            @* asp-for：綁定 ViewModel 的屬性，自動產生 name、id、label *@
+                            <label asp-for="FullName" class="form-label"></label>
+                            <input asp-for="FullName" class="form-control" placeholder="請輸入真實姓名" />
+                            @* 顯示這個欄位的驗證錯誤 *@
+                            <span asp-validation-for="FullName" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Email" class="form-label"></label>
+                            <input asp-for="Email" class="form-control" placeholder="example@gmail.com" />
+                            <span asp-validation-for="Email" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Password" class="form-label"></label>
+                            <input asp-for="Password" class="form-control" placeholder="至少 8 個字元" />
+                            <span asp-validation-for="Password" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="ConfirmPassword" class="form-label"></label>
+                            <input asp-for="ConfirmPassword" class="form-control" />
+                            <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-4">
+                            <label asp-for="Role" class="form-label"></label>
+                            <div class="d-flex gap-3">
+                                @* 三個身份選項，用 Radio Button *@
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio"
+                                           asp-for="Role" value="0" id="roleCustomer" />
+                                    <label class="form-check-label" for="roleCustomer">
+                                        🙋 我是顧客
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio"
+                                           asp-for="Role" value="1" id="roleDriver" />
+                                    <label class="form-check-label" for="roleDriver">
+                                        🛵 我是外送師
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio"
+                                           asp-for="Role" value="2" id="roleOwner" />
+                                    <label class="form-check-label" for="roleOwner">
+                                        🧑‍🍳 我是老闆
+                                    </label>
+                                </div>
+                            </div>
+                            <span asp-validation-for="Role" class="text-danger"></span>
+                        </div>
+
+                        <button type="submit" class="btn btn-warning w-100 fw-bold">
+                            註冊帳號
+                        </button>
+                    </form>
+
+                    <hr />
+                    <div class="text-center">
+                        已有帳號？
+                        <a asp-action="Login" asp-controller="Account">立即登入</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @* 引入前端驗證 JS，讓錯誤訊息不用等到送出才顯示 *@
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+}

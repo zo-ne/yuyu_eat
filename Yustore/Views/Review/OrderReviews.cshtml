@@ -1,0 +1,88 @@
+﻿@model Yustore.ViewModels.OrderReviewViewModel
+@{
+    ViewData["Title"] = "訂單評分";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-7">
+
+            @if (TempData["Message"] != null)
+            {
+                <div class="alert alert-success">@TempData["Message"]</div>
+            }
+            @if (TempData["Error"] != null)
+            {
+                <div class="alert alert-danger">@TempData["Error"]</div>
+            }
+
+            <div class="card shadow">
+                <div class="card-header bg-warning text-white">
+                    <h4>⭐ 訂單評分</h4>
+                    <small>訂單：@Model.OrderNumber</small>
+                </div>
+                <div class="card-body">
+
+                    @if (!Model.PendingReviews.Any())
+                    {
+                        <p class="text-muted text-center py-3">
+                            沒有需要評分的對象。
+                        </p>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model.PendingReviews)
+                        {
+                            <div class="card mb-3 @(item.AlreadyReviewed ? "border-success" : "border-warning")">
+                                <div class="card-body d-flex
+                                            justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">
+                                            @GetRoleIcon(item.TargetType)
+                                            @item.TargetUserName
+                                        </h6>
+                                        <small class="text-muted">
+                                            @item.TargetType.ToString()
+                                        </small>
+                                    </div>
+
+                                    @if (item.AlreadyReviewed)
+                                    {
+                                        <span class="badge bg-success">✅ 已評分</span>
+                                    }
+                                    else
+                                    {
+                                        <a asp-action="Create"
+                                           asp-route-orderId="@Model.OrderId"
+                                           asp-route-targetUserId="@item.TargetUserId"
+                                           asp-route-targetType="@((int)item.TargetType)"
+                                           class="btn btn-warning btn-sm">
+                                            給評分 ⭐
+                                        </a>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+
+                    <div class="mt-3">
+                        <a onclick="history.back()"
+                           class="btn btn-outline-secondary">
+                            ← 返回
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@functions {
+    string GetRoleIcon(Yustore.Enums.ReviewTargetType type) => type switch
+    {
+        Yustore.Enums.ReviewTargetType.老闆 => "🧑‍🍳",
+        Yustore.Enums.ReviewTargetType.外送師 => "🛵",
+        Yustore.Enums.ReviewTargetType.顧客 => "🙋",
+        _ => "👤"
+    };
+}

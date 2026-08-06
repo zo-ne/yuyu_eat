@@ -1,0 +1,92 @@
+﻿@using Yustore.Models.Entities
+@{
+    ViewData["Title"] = "外送師後台";
+    var activeDeliveries = ViewBag.ActiveDeliveries as List<Delivery>;
+}
+
+<div class="container mt-4">
+
+    @if (TempData["Message"] != null)
+    {
+        <div class="alert alert-success">@TempData["Message"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+
+    <h2 class="mb-4">🛵 外送師後台</h2>
+
+    @* 統計卡片 *@
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-center border-warning">
+                <div class="card-body">
+                    <h1 class="text-warning">@ViewBag.MonthlyCount</h1>
+                    <p class="text-muted mb-0">本月完成訂單</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center border-success">
+                <div class="card-body">
+                    <h1 class="text-success">$@ViewBag.MonthlyIncome</h1>
+                    <p class="text-muted mb-0">本月外送費收入</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* 快速入口 *@
+    <div class="row mb-4 g-3">
+        <div class="col-md-6">
+            <a asp-action="AvailableOrders"
+               class="btn btn-warning w-100 py-3 fw-bold fs-5">
+                🔍 查看可接訂單
+            </a>
+        </div>
+        <div class="col-md-6">
+            <a asp-action="MyOrders"
+               class="btn btn-outline-warning w-100 py-3 fw-bold fs-5">
+                📋 我的訂單記錄
+            </a>
+        </div>
+    </div>
+
+    @* 進行中的訂單 *@
+    <h5>🚀 進行中的訂單</h5>
+    @if (activeDeliveries == null || !activeDeliveries.Any())
+    {
+        <div class="alert alert-info">目前沒有進行中的訂單。</div>
+    }
+    else
+    {
+        @foreach (var delivery in activeDeliveries)
+        {
+            <div class="card mb-3 border-warning shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>@delivery.Order.OrderNumber</strong>
+                            <span class="ms-2 badge bg-warning text-dark">外送中</span>
+                        </div>
+                        <span class="text-muted small">
+                            $@delivery.Order.GrandTotal
+                        </span>
+                    </div>
+                    <p class="mb-1 mt-2">
+                        🏪 @delivery.Order.Restaurant?.Name
+                    </p>
+                    <p class="mb-2">
+                        📍 @delivery.Order.DeliveryAddress
+                    </p>
+                    <a asp-action="CompleteOrder"
+                       asp-route-deliveryId="@delivery.Id"
+                       class="btn btn-success btn-sm">
+                        ✅ 完成送達（上傳照片）
+                    </a>
+                </div>
+            </div>
+        }
+    }
+</div>

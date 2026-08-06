@@ -1,0 +1,66 @@
+﻿@model List<Yustore.Models.Entities.Order>
+@using Yustore.Enums
+@{
+    ViewData["Title"] = "我的訂單";
+}
+
+<div class="container mt-4">
+    <h3 class="mb-4">📋 我的訂單</h3>
+
+    @if (TempData["Message"] != null)
+    {
+        <div class="alert alert-success">@TempData["Message"]</div>
+    }
+
+    @if (!Model.Any())
+    {
+        <div class="alert alert-info text-center py-5">
+            <h5>還沒有訂單紀錄</h5>
+            <a asp-action="Index" class="btn btn-warning mt-2">去點餐吧！</a>
+        </div>
+    }
+    else
+    {
+        @foreach (var order in Model)
+        {
+            <div class="card mb-3 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>@order.OrderNumber</strong>
+                            <span class="ms-2 badge @GetBadge(order.Status)">
+                                @order.Status
+                            </span>
+                        </div>
+                        <small class="text-muted">
+                            @order.CreatedAt.ToString("yyyy/MM/dd HH:mm")
+                        </small>
+                    </div>
+                    <p class="text-muted mb-1 mt-2">🏪 @order.Restaurant?.Name</p>
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <span class="fw-bold text-warning">總計 $@order.GrandTotal</span>
+                        <a asp-action="OrderDetail" asp-route-orderId="@order.Id"
+                           class="btn btn-outline-warning btn-sm">
+                            查看詳細
+                        </a>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@functions {
+    string GetBadge(Yustore.Enums.OrderStatus status) => status switch
+    {
+        OrderStatus.待付款 => "bg-secondary",
+        OrderStatus.已付款 => "bg-info",
+        OrderStatus.備餐中 => "bg-primary",
+        OrderStatus.待取餐 => "bg-warning text-dark",
+        OrderStatus.外送中 => "bg-warning text-dark",
+        OrderStatus.已送達 => "bg-success",
+        OrderStatus.完成 => "bg-success",
+        OrderStatus.已取消 => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

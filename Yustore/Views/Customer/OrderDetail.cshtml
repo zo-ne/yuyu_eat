@@ -1,0 +1,94 @@
+﻿@model Yustore.Models.Entities.Order
+@using Yustore.Enums
+@{
+    ViewData["Title"] = "訂單詳細";
+}
+
+<div class="container mt-4">
+
+    @if (TempData["Message"] != null)
+    {
+        <div class="alert alert-success">@TempData["Message"]</div>
+    }
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>訂單 @Model.OrderNumber</h3>
+        <span class="badge fs-6 @GetBadge(Model.Status)">@Model.Status</span>
+    </div>
+
+    <div class="row">
+        <div class="col-md-7">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header"><strong>餐點明細</strong></div>
+                <div class="card-body">
+                    @foreach (var item in Model.OrderItems)
+                    {
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>@item.MenuItem?.Name × @item.Quantity</span>
+                            <span>$@item.Subtotal</span>
+                        </div>
+                    }
+                    <hr />
+                    <div class="d-flex justify-content-between">
+                        <span>餐費</span><span>$@Model.FoodTotal</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>外送費</span><span>$@Model.DeliveryFee</span>
+                    </div>
+                    <div class="d-flex justify-content-between fw-bold fs-5 mt-2">
+                        <span>總計</span>
+                        <span class="text-warning">$@Model.GrandTotal</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-5">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header"><strong>訂單資訊</strong></div>
+                <div class="card-body">
+                    <p><strong>🏪 店家：</strong>@Model.Restaurant?.Name</p>
+                    <p><strong>📍 地址：</strong>@Model.DeliveryAddress</p>
+                    @if (!string.IsNullOrEmpty(Model.Note))
+                    {
+                        <p><strong>📝 備註：</strong>@Model.Note</p>
+                    }
+                    @if (Model.Delivery?.Driver != null)
+                    {
+                        <p><strong>🛵 外送師：</strong>@Model.Delivery.Driver.FullName</p>
+                    }
+                    <p><strong>🕐 下單時間：</strong>@Model.CreatedAt.ToString("yyyy/MM/dd HH:mm")</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* 已送達或完成才顯示評分按鈕 *@
+    @if (Model.Status == Yustore.Enums.OrderStatus.已送達 ||
+    Model.Status == Yustore.Enums.OrderStatus.完成)
+    {
+        <a asp-controller="Review"
+           asp-action="OrderReviews"
+           asp-route-orderId="@Model.Id"
+           class="btn btn-warning me-2">
+            ⭐ 評分
+        </a>
+    }
+
+    <a asp-action="MyOrders" class="btn btn-outline-secondary">← 回我的訂單</a>
+</div>
+
+@functions {
+    string GetBadge(Yustore.Enums.OrderStatus status) => status switch
+    {
+        OrderStatus.待付款 => "bg-secondary",
+        OrderStatus.已付款 => "bg-info",
+        OrderStatus.備餐中 => "bg-primary",
+        OrderStatus.待取餐 => "bg-warning text-dark",
+        OrderStatus.外送中 => "bg-warning text-dark",
+        OrderStatus.已送達 => "bg-success",
+        OrderStatus.完成 => "bg-success",
+        OrderStatus.已取消 => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

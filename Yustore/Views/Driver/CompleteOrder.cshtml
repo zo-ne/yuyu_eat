@@ -1,0 +1,86 @@
+﻿@model Yustore.Models.Entities.Delivery
+@{
+    ViewData["Title"] = "完成送達";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h4>✅ 確認送達</h4>
+                </div>
+                <div class="card-body">
+
+                    @* 訂單資訊 *@
+                    <div class="alert alert-light mb-4">
+                        <p class="mb-1">
+                            <strong>訂單：</strong>@Model.Order.OrderNumber
+                        </p>
+                        <p class="mb-1">
+                            <strong>顧客：</strong>@Model.Order.Customer?.FullName
+                        </p>
+                        <p class="mb-1">
+                            <strong>地址：</strong>@Model.Order.DeliveryAddress
+                        </p>
+                        <p class="mb-0">
+                            <strong>金額：</strong>
+                            <span class="text-warning fw-bold">
+                                $@Model.Order.GrandTotal
+                            </span>
+                            （向顧客收取現金）
+                        </p>
+                    </div>
+
+                    <form asp-action="CompleteOrder" method="post"
+                          enctype="multipart/form-data">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="deliveryId" value="@Model.Id" />
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                📷 上傳送達照片
+                            </label>
+                            <input name="proofPhoto" type="file"
+                                   class="form-control"
+                                   accept="image/*"
+                                   onchange="previewImage(this)" />
+                            <small class="text-muted">
+                                拍下餐點放置位置的照片（選填）
+                            </small>
+                            <img id="preview" src="#" class="mt-2 rounded w-100"
+                                 style="display:none;max-height:200px;object-fit:cover;" />
+                        </div>
+
+                        <button type="submit"
+                                class="btn btn-success w-100 py-3 fw-bold fs-5"
+                                onclick="return confirm('確認已送達並向顧客收取現金？')">
+                            ✅ 確認送達完成
+                        </button>
+                    </form>
+
+                    <a asp-action="MyOrders"
+                       class="btn btn-outline-secondary w-100 mt-2">
+                        取消
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function previewImage(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    var preview = document.getElementById('preview');
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+    </script>
+}

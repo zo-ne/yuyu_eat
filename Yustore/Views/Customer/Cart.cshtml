@@ -1,0 +1,100 @@
+﻿@model Yustore.ViewModels.CartViewModel
+@{
+    ViewData["Title"] = "購物車";
+}
+
+<div class="container mt-4">
+    <h3 class="mb-4">🛒 我的購物車</h3>
+
+    @if (!Model.Items.Any())
+    {
+        <div class="alert alert-info text-center py-5">
+            <h4>購物車是空的</h4>
+            <a asp-action="Index" class="btn btn-warning mt-3">去逛逛店家</a>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-white">
+                        <strong>@Model.RestaurantName</strong> 的餐點
+                    </div>
+                    <div class="card-body">
+                        @foreach (var item in Model.Items)
+                        {
+                            <div class="d-flex align-items-center mb-3 pb-3 border-bottom">
+                                @if (!string.IsNullOrEmpty(item.ImageUrl))
+                                {
+                                    <img src="@item.ImageUrl" class="rounded me-3"
+                                         style="width:60px;height:60px;object-fit:cover;" />
+                                }
+                                <div class="flex-fill">
+                                    <h6 class="mb-0">@item.Name</h6>
+                                    <small class="text-muted">$@item.Price / 份</small>
+                                </div>
+
+                                @* 數量調整 *@
+                                <div class="d-flex align-items-center gap-2">
+                                    <form asp-action="UpdateCart" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="menuItemId" value="@item.MenuItemId" />
+                                        <input type="hidden" name="quantity" value="@(item.Quantity - 1)" />
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm">－</button>
+                                    </form>
+
+                                    <span class="fw-bold">@item.Quantity</span>
+
+                                    <form asp-action="UpdateCart" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="menuItemId" value="@item.MenuItemId" />
+                                        <input type="hidden" name="quantity" value="@(item.Quantity + 1)" />
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm">＋</button>
+                                    </form>
+
+                                    <span class="fw-bold text-warning ms-2">$@item.Subtotal</span>
+
+                                    <form asp-action="RemoveFromCart" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="menuItemId" value="@item.MenuItemId" />
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">✕</button>
+                                    </form>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h5 class="mb-3">訂單摘要</h5>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>餐費小計</span>
+                            <span>$@Model.FoodTotal</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>外送費</span>
+                            <span>$@Model.DeliveryFee</span>
+                        </div>
+                        <hr />
+                        <div class="d-flex justify-content-between fw-bold fs-5">
+                            <span>總計</span>
+                            <span class="text-warning">$@Model.GrandTotal</span>
+                        </div>
+                        <a asp-action="Checkout"
+                           class="btn btn-warning w-100 mt-3 fw-bold">
+                            前往結帳 →
+                        </a>
+                        <a asp-action="Index"
+                           class="btn btn-outline-secondary w-100 mt-2">
+                            繼續點餐
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
