@@ -321,7 +321,7 @@ namespace Yustore.Controllers
                 {
                     await _emailService.SendEmailAsync(
                         driver.Email!,
-                        "【阿裕食堂】新訂單可以接單！",
+                        "【YUYUEAT】新訂單可以接單！",
                         $@"<h2>有新訂單可以接！</h2>
                            <p>訂單編號：<strong>{order.OrderNumber}</strong></p>
                            <p>金額：<strong>${order.GrandTotal}</strong></p>

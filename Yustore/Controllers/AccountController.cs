@@ -79,8 +79,8 @@ namespace Yustore.Controllers
                 // 寄驗證信
                 await _emailService.SendEmailAsync(
                     user.Email,
-                    "【阿裕食堂】請驗證您的 Email",
-                    $@"<h2>歡迎加入阿裕食堂！</h2>
+                    "【YUYUEAT】請驗證您的 Email",
+                    $@"<h2>歡迎加入YUYUEAT！</h2>
                        <p>親愛的 {user.FullName}，</p>
                        <p>請點擊下方連結完成 Email 驗證：</p>
                        <a href='{confirmUrl}' 
@@ -88,7 +88,7 @@ namespace Yustore.Controllers
                                  text-decoration:none;border-radius:5px;'>
                           驗證我的帳號
                        </a>
-                       <p>若您沒有註冊阿裕食堂，請忽略此信。</p>"
+                       <p>若您沒有註冊YUYUEAT，請忽略此信。</p>"
                 );
 
                 // 跳到「請去收信」提示頁面
