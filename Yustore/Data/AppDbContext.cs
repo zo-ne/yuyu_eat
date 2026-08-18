@@ -21,6 +21,13 @@ namespace Yustore.Data
             base.OnModelCreating(builder);
 
             // ── Review ──────────────────────────────────────
+            // V-01 修復（最後一道防線）：Controller 層已經驗證過評分對象合法性，
+            // 這裡再加一個 DB 層的 unique 約束，就算未來哪個新的呼叫路徑忘記檢查，
+            // 同一個人也不可能對同一筆訂單的同一個對象重複建立第二筆評分。
+            builder.Entity<Review>()
+                .HasIndex(r => new { r.OrderId, r.ReviewerId, r.TargetUserId })
+                .IsUnique();
+
             builder.Entity<Review>()
                 .HasOne(r => r.Reviewer)
                 .WithMany(u => u.ReviewsGiven)
@@ -54,6 +61,11 @@ namespace Yustore.Data
                 .OnDelete(DeleteBehavior.Restrict);
 
             // ── Order ────────────────────────────────────────
+            // V-10 修復：OrderNumber 原本沒有 unique 約束，碰撞會安靜地產生兩張同編號的訂單。
+            builder.Entity<Order>()
+                .HasIndex(o => o.OrderNumber)
+                .IsUnique();
+
             builder.Entity<Order>()
                 .HasOne(o => o.Customer)
                 .WithMany(u => u.CustomerOrders)

@@ -1,22 +1,29 @@
-﻿using System.Text.Json;
+﻿using System.Security.Claims;
+using System.Text.Json;
 using Yustore.ViewModels;
 
 namespace Yustore.Services
 {
     public class CartService : ICartService
     {
-        // Session 的 Key 名稱，用來存取購物車資料
-        private const string CartKey = "ShoppingCart";
-
         // 單一品項在購物車裡的數量上限，Controller 已經驗證過一次，
         // 這裡再做一次是縱深防禦（V-03 修復）：就算未來有其他呼叫路徑忘記驗證，這裡還是會擋住。
         private const int MaxQuantityPerItem = 99;
+
+        // V-09 修復：原本 Session Key 是固定字串 "ShoppingCart"，不含使用者 ID。
+        // 同一台電腦、同一瀏覽器換人登入會看到前一位使用者的購物車（就算 Logout 沒清 Session 也一樣）。
+        // 這裡把 Key 綁定當前登入者的 Id，不同使用者的購物車在 Session 裡天生就不會互相覆蓋。
+        private static string GetCartKey(HttpContext httpContext)
+        {
+            var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            return $"Cart:{userId ?? "anonymous"}";
+        }
 
         // 取得購物車（從 Session 讀出來）
         public CartViewModel GetCart(HttpContext httpContext)
         {
             // Session 存的是字串，所以要用 JSON 序列化/反序列化
-            var json = httpContext.Session.GetString(CartKey);
+            var json = httpContext.Session.GetString(GetCartKey(httpContext));
 
             if (string.IsNullOrEmpty(json))
                 return new CartViewModel(); // 購物車是空的
@@ -30,7 +37,7 @@ namespace Yustore.Services
         {
             // 把 CartViewModel 物件轉成 JSON 字串存進 Session
             var json = JsonSerializer.Serialize(cart);
-            httpContext.Session.SetString(CartKey, json);
+            httpContext.Session.SetString(GetCartKey(httpContext), json);
         }
 
         public void AddToCart(HttpContext httpContext, CartItemViewModel item,
@@ -86,7 +93,7 @@ namespace Yustore.Services
 
         public void ClearCart(HttpContext httpContext)
         {
-            httpContext.Session.Remove(CartKey);
+            httpContext.Session.Remove(GetCartKey(httpContext));
         }
     }
 }

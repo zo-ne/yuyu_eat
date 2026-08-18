@@ -42,7 +42,7 @@
                                             @item.TargetUserName
                                         </h6>
                                         <small class="text-muted">
-                                            @item.TargetType.ToString()
+                                            @item.TargetType.GetDisplayName()
                                         </small>
                                     </div>
 
@@ -80,9 +80,9 @@
 @functions {
     string GetRoleIcon(Yustore.Enums.ReviewTargetType type) => type switch
     {
-        Yustore.Enums.ReviewTargetType.老闆 => "🧑‍🍳",
-        Yustore.Enums.ReviewTargetType.外送師 => "🛵",
-        Yustore.Enums.ReviewTargetType.顧客 => "🙋",
+        Yustore.Enums.ReviewTargetType.Owner => "🧑‍🍳",
+        Yustore.Enums.ReviewTargetType.Driver => "🛵",
+        Yustore.Enums.ReviewTargetType.Customer => "🙋",
         _ => "👤"
     };
 }

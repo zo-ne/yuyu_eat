@@ -10,6 +10,10 @@
     {
         <div class="alert alert-success">@TempData["Message"]</div>
     }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3>📋 訂單管理</h3>
@@ -29,7 +33,7 @@
                     <div>
                         <strong>@order.OrderNumber</strong>
                         <span class="ms-2 badge @GetStatusBadgeClass(order.Status)">
-                            @order.Status
+                            @order.Status.GetDisplayName()
                         </span>
                     </div>
                     <small class="text-muted">
@@ -75,30 +79,30 @@
 
                 @* 狀態更新按鈕 *@
                 <div class="card-footer d-flex gap-2 flex-wrap">
-                    @if (order.Status == OrderStatus.已付款)
+                    @if (order.Status == OrderStatus.Paid)
                     {
                         <form asp-action="UpdateOrderStatus" method="post">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="orderId" value="@order.Id" />
-                            <input type="hidden" name="newStatus" value="@((int)OrderStatus.備餐中)" />
+                            <input type="hidden" name="newStatus" value="@((int)OrderStatus.Preparing)" />
                             <button type="submit" class="btn btn-primary btn-sm">
                                 開始備餐
                             </button>
                         </form>
                     }
-                    @if (order.Status == OrderStatus.備餐中)
+                    @if (order.Status == OrderStatus.Preparing)
                     {
                         <form asp-action="UpdateOrderStatus" method="post">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="orderId" value="@order.Id" />
-                            <input type="hidden" name="newStatus" value="@((int)OrderStatus.待取餐)" />
+                            <input type="hidden" name="newStatus" value="@((int)OrderStatus.ReadyForPickup)" />
                             <button type="submit" class="btn btn-warning btn-sm">
                                 餐點完成（通知外送師）
                             </button>
                         </form>
                     }
-                    @if (order.Status == OrderStatus.已送達 ||
-                   order.Status == OrderStatus.完成)
+                    @if (order.Status == OrderStatus.Delivered ||
+                   order.Status == OrderStatus.Completed)
                     {
                         <a asp-controller="Review"
                            asp-action="OrderReviews"
@@ -117,14 +121,14 @@
 @functions {
     string GetStatusBadgeClass(Yustore.Enums.OrderStatus status) => status switch
     {
-        OrderStatus.待付款 => "bg-secondary",
-        OrderStatus.已付款 => "bg-info",
-        OrderStatus.備餐中 => "bg-primary",
-        OrderStatus.待取餐 => "bg-warning text-dark",
-        OrderStatus.外送中 => "bg-warning text-dark",
-        OrderStatus.已送達 => "bg-success",
-        OrderStatus.完成 => "bg-success",
-        OrderStatus.已取消 => "bg-danger",
+        OrderStatus.PendingPayment => "bg-secondary",
+        OrderStatus.Paid => "bg-info",
+        OrderStatus.Preparing => "bg-primary",
+        OrderStatus.ReadyForPickup => "bg-warning text-dark",
+        OrderStatus.OutForDelivery => "bg-warning text-dark",
+        OrderStatus.Delivered => "bg-success",
+        OrderStatus.Completed => "bg-success",
+        OrderStatus.Cancelled => "bg-danger",
         _ => "bg-secondary"
     };
 }

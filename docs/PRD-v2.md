@@ -196,10 +196,10 @@
 
 ## 8. 里程碑與時間表（以 1~3 個月為基準，可依實際時數伸縮）
 
-| 里程碑 | 內容 | 對應文件章節 | 預估 |
-|---|---|---|---|
-| **M0：止血** | .gitignore 修正、移除已 commit 的上傳檔案、修 V-01/V-02、補 `Error` action、刪除 `AYuCantina`、寫 README | ASSESSMENT §6 階段 0 | 3~5 天 |
-| **M1：安全與正確性** | V-03 ~ V-15 全部修復；enum 改英文；圖片上傳改用 ImageSharp | ASSESSMENT §6 階段 1 | 1 週 |
+| 里程碑 | 內容 | 對應文件章節 | 預估 | 狀態 |
+|---|---|---|---|---|
+| **M0：止血** | .gitignore 修正、移除已 commit 的上傳檔案、修 V-01/V-02/V-03/V-12、補 `Error` action、刪除 `AYuCantina`、寫 README | ASSESSMENT §6 階段 0 | 3~5 天 | ✅ 完成（`m0-security-hotfix`） |
+| **M1：安全與正確性** | V-04~V-11/V-13~V-15 全部修復；enum 改英文；圖片上傳改用 ImageSharp | ASSESSMENT §6 階段 1 | 1 週 | ✅ 完成（`m1-security-hardening`） |
 | **M2：工程實務** | Docker、xUnit 單元測試、GitHub Actions CI、Serilog、`.editorconfig` | ASSESSMENT §6 階段 2 | 1~1.5 週 |
 | **M3：架構重構** | Service 層拆分、DTO 投影、Options Pattern、分頁、角色改用 Claims | ASSESSMENT §6 階段 3 | 1.5~2 週 |
 | **M4：治理與商業模式** | Admin 後台（審核/停權/訂單總覽）、申請制上線、`Settlement` 拆分為分潤+月結批次 | 本文件 §5.6, §7 | 1.5~2 週 |

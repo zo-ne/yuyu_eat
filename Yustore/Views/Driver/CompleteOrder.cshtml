@@ -12,6 +12,11 @@
                 </div>
                 <div class="card-body">
 
+                    @if (TempData["Error"] != null)
+                    {
+                        <div class="alert alert-danger">@TempData["Error"]</div>
+                    }
+
                     @* 訂單資訊 *@
                     <div class="alert alert-light mb-4">
                         <p class="mb-1">

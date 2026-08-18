@@ -37,7 +37,7 @@
                         }
 
                         @* 老闆選單 *@
-                        @if (currentUser?.Role == Yustore.Enums.UserRole.老闆)
+                        @if (currentUser?.Role == Yustore.Enums.UserRole.Owner)
                         {
                             <li class="nav-item">
                                 <a class="nav-link text-white fw-bold"
@@ -60,7 +60,7 @@
                         }
 
                         @* 外送師選單 *@
-                        @if (currentUser?.Role == Yustore.Enums.UserRole.外送師)
+                        @if (currentUser?.Role == Yustore.Enums.UserRole.Driver)
                         {
                             <li class="nav-item">
                                 <a class="nav-link text-white fw-bold"
@@ -83,7 +83,7 @@
                         }
 
                         @* 顧客選單 *@
-                        @if (currentUser?.Role == Yustore.Enums.UserRole.顧客)
+                        @if (currentUser?.Role == Yustore.Enums.UserRole.Customer)
                         {
                             <li class="nav-item">
                                 <a class="nav-link text-white fw-bold"

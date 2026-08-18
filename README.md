@@ -81,6 +81,16 @@ dotnet run --project Yustore
 
 預設會在 `http://localhost:5247` 啟動（見 [`Yustore/Properties/launchSettings.json`](Yustore/Properties/launchSettings.json)）。
 
+### 5. 開通老闆／外送師帳號（M1 起適用）
+
+註冊「老闆」或「外送師」身分後，帳號預設是 `IsActive = false`（V-08 修復：防止任何人自行註冊成店家/外送員），要等審核通過才能使用相關功能。目前還沒有 Admin 後台（排在 M4），開發階段要手動用 SQL 開通：
+
+```sql
+UPDATE AspNetUsers SET IsActive = 1 WHERE Email = 'owner@example.com';
+```
+
+顧客帳號不受影響，驗證 Email 後即可直接使用。
+
 ## 資料模型
 
 ```mermaid
@@ -115,12 +125,12 @@ erDiagram
 
 ## 已知限制
 
-目前處於 [`docs/PRD-v2.md`](docs/PRD-v2.md) 規劃的 M0（止血）階段完成後的狀態：核心安全漏洞（越權評分、級聯刪除歷史資料、購物車數量未驗證）已修復，但下列項目仍在後續里程碑中：
+目前處於 [`docs/PRD-v2.md`](docs/PRD-v2.md) 規劃的 **M0（止血）+ M1（安全與正確性）** 完成後的狀態：[`docs/ASSESSMENT.md`](docs/ASSESSMENT.md) 列出的全部 17 項安全/正確性漏洞（V-01 ~ V-17）都已修復，enum 也已全面改為英文命名。下列項目仍在後續里程碑中：
 
-- 金流為模擬付款，尚未串接真實金流
-- 尚無 Admin 治理後台
-- 訂單狀態可被老闆任意跳轉，尚無狀態機約束（M1 處理）
-- 尚無自動化測試與 CI（M2 處理）
+- 金流為模擬付款，尚未串接真實金流（M5）
+- 尚無 Admin 治理後台，老闆／外送師帳號審核目前只能手動改 `IsActive`（M4）
+- 尚無自動化測試與 CI、無 Docker（M2）
+- 老闆後台統計數字只算最近 10 筆訂單（P-01）、`_Layout` 有多餘的 DB 查詢（P-03）、全站零分頁（P-04）等效能項目尚未處理（M3 架構重構階段）
 - Session 用記憶體、上傳檔案存本機磁碟，尚未支援水平擴展
 
 完整清單見 [`docs/ASSESSMENT.md`](docs/ASSESSMENT.md)。

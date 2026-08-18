@@ -9,7 +9,7 @@ using Yustore.Services;
 
 namespace Yustore.Controllers
 {
-    [DriverOnly]
+    [RoleRequired(UserRole.Driver)]
     public class DriverController : Controller
     {
         private readonly AppDbContext _db;
@@ -70,7 +70,7 @@ namespace Yustore.Controllers
         {
             // 找出所有「待取餐」且還沒有外送師接的訂單
             var orders = await _db.Orders
-                .Where(o => o.Status == OrderStatus.待取餐
+                .Where(o => o.Status == OrderStatus.ReadyForPickup
                     && o.Delivery == null) // 還沒有人接
                 .Include(o => o.Restaurant)
                 .Include(o => o.Customer)
@@ -88,20 +88,23 @@ namespace Yustore.Controllers
         {
             var user = await _userManager.GetUserAsync(User);
 
-            // 確認訂單存在且是「待取餐」且還沒人接
-            var order = await _db.Orders
-                .Include(o => o.Delivery)
-                .FirstOrDefaultAsync(o => o.Id == orderId
-                    && o.Status == OrderStatus.待取餐
-                    && o.Delivery == null);
+            // V-11 修復：原本「查詢」跟「寫入」是兩個分開的步驟，中間有時間差 ——
+            // 兩位外送師同時按接單，兩邊的查詢都會通過檢查，其中一邊寫入時才會因為
+            // Delivery.OrderId 的 unique 索引而失敗，而且是丟出未處理例外變成 500 錯誤頁。
+            // 改成條件式 UPDATE（WHERE Status = ReadyForPickup AND Delivery IS NULL），
+            // 這是資料庫層級的單一原子操作，兩個並發請求只會有一個真的更新成功。
+            var claimed = await _db.Orders
+                .Where(o => o.Id == orderId && o.Status == OrderStatus.ReadyForPickup && o.Delivery == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, OrderStatus.OutForDelivery));
 
-            if (order == null)
+            if (claimed == 0)
             {
                 TempData["Error"] = "這筆訂單已被其他外送師接走了！";
                 return RedirectToAction("AvailableOrders");
             }
 
-            // 建立 Delivery 記錄
+            // 建立 Delivery 記錄。前面的原子 UPDATE 已經確保只有我們搶到這筆訂單，
+            // 但還是包 try/catch，讓 unique 索引這道最後防線萬一擋下來時顯示友善訊息而不是 500。
             var delivery = new Delivery
             {
                 OrderId = orderId,
@@ -109,11 +112,17 @@ namespace Yustore.Controllers
                 PickedUpAt = DateTime.Now
             };
 
-            // 更新訂單狀態為「外送中」
-            order.Status = OrderStatus.外送中;
-
             _db.Deliveries.Add(delivery);
-            await _db.SaveChangesAsync();
+
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                TempData["Error"] = "接單失敗，請重新整理後再試一次。";
+                return RedirectToAction("AvailableOrders");
+            }
 
             TempData["Message"] = "接單成功！請前往取餐。";
             return RedirectToAction("MyOrders");
@@ -170,6 +179,7 @@ namespace Yustore.Controllers
         // POST: /Driver/CompleteOrder
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [RequestSizeLimit(6_000_000)] // V-06 修復
         public async Task<IActionResult> CompleteOrder(int deliveryId, IFormFile? proofPhoto)
         {
             var user = await _userManager.GetUserAsync(User);
@@ -186,15 +196,23 @@ namespace Yustore.Controllers
             // 上傳完成照片
             if (proofPhoto != null && proofPhoto.Length > 0)
             {
-                delivery.ProofPhotoUrl = await _imageService
-                    .SaveImageAsync(proofPhoto, "proofs");
+                try
+                {
+                    delivery.ProofPhotoUrl = await _imageService
+                        .SaveImageAsync(proofPhoto, "proofs");
+                }
+                catch (ArgumentException ex)
+                {
+                    TempData["Error"] = ex.Message;
+                    return RedirectToAction("CompleteOrder", new { deliveryId });
+                }
             }
 
             // 記錄送達時間
             delivery.DeliveredAt = DateTime.Now;
 
             // 更新訂單狀態為「已送達」
-            delivery.Order.Status = OrderStatus.已送達;
+            delivery.Order.Status = OrderStatus.Delivered;
 
             // 建立結算記錄
             // 外送師收了顧客的現金，餐費部分要月底結算給老闆
@@ -207,7 +225,7 @@ namespace Yustore.Controllers
                 DriverId = user!.Id,
                 OwnerId = restaurant!.OwnerId,
                 FoodAmount = delivery.Order.FoodTotal, // 餐費（不含外送費）
-                Status = SettlementStatus.未結算,
+                Status = SettlementStatus.Unsettled,
                 Year = DateTime.Now.Year,
                 Month = DateTime.Now.Month
             };

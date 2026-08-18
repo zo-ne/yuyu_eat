@@ -12,14 +12,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="MailKit" Version="4.3.0" />
+    <!-- 升到 4.17.0：4.3.0 有一個已知中度風險漏洞（GHSA-9j88-vvj5-vhgr）。
+         EmailService 只用到最基本穩定的 SmtpClient/MimeMessage API，升級風險低。 -->
+    <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.11">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.7" />
+    <!-- 升到 3.1.12：3.1.7 有一個已知中度風險漏洞（GHSA-rxmq-m78w-7wmc），
+         現在這個套件真的拿來處理使用者上傳的圖片了（V-06 修復），這個漏洞才變得有意義，得先補上。
+         留在 3.x 系列（不跳 4.x 大版本）是為了避免非必要的 API 破壞性變更。 -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
   </ItemGroup>
 
 </Project>

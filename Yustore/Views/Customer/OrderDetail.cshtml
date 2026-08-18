@@ -13,7 +13,7 @@
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3>訂單 @Model.OrderNumber</h3>
-        <span class="badge fs-6 @GetBadge(Model.Status)">@Model.Status</span>
+        <span class="badge fs-6 @GetBadge(Model.Status)">@Model.Status.GetDisplayName()</span>
     </div>
 
     <div class="row">
@@ -64,8 +64,8 @@
     </div>
 
     @* 已送達或完成才顯示評分按鈕 *@
-    @if (Model.Status == Yustore.Enums.OrderStatus.已送達 ||
-    Model.Status == Yustore.Enums.OrderStatus.完成)
+    @if (Model.Status == Yustore.Enums.OrderStatus.Delivered ||
+    Model.Status == Yustore.Enums.OrderStatus.Completed)
     {
         <a asp-controller="Review"
            asp-action="OrderReviews"
@@ -81,14 +81,14 @@
 @functions {
     string GetBadge(Yustore.Enums.OrderStatus status) => status switch
     {
-        OrderStatus.待付款 => "bg-secondary",
-        OrderStatus.已付款 => "bg-info",
-        OrderStatus.備餐中 => "bg-primary",
-        OrderStatus.待取餐 => "bg-warning text-dark",
-        OrderStatus.外送中 => "bg-warning text-dark",
-        OrderStatus.已送達 => "bg-success",
-        OrderStatus.完成 => "bg-success",
-        OrderStatus.已取消 => "bg-danger",
+        OrderStatus.PendingPayment => "bg-secondary",
+        OrderStatus.Paid => "bg-info",
+        OrderStatus.Preparing => "bg-primary",
+        OrderStatus.ReadyForPickup => "bg-warning text-dark",
+        OrderStatus.OutForDelivery => "bg-warning text-dark",
+        OrderStatus.Delivered => "bg-success",
+        OrderStatus.Completed => "bg-success",
+        OrderStatus.Cancelled => "bg-danger",
         _ => "bg-secondary"
     };
 }
