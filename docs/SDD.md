@@ -250,6 +250,7 @@ await _db.SaveChangesAsync();   // ← 寄信失敗的話,狀態根本不會被�
 
 ## 相關文件
 
-- [PRD.md](./PRD.md) — 產品需求文件
+- [PRD.md](./PRD.md) — 產品需求文件（反推現況）
+- [PRD-v2.md](./PRD-v2.md) — 目標產品需求文件（含時間表與驗收標準）
 - [ASSESSMENT.md](./ASSESSMENT.md) — 漏洞、業界落差與改善方案
 - [ROADMAP-外送平台.md](./ROADMAP-外送平台.md) — 平台化路線圖

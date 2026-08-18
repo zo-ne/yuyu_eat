@@ -176,6 +176,7 @@
 
 ## 相關文件
 
+- [PRD-v2.md](./PRD-v2.md) — 目標產品需求文件（What SHOULD BE，含時間表與驗收標準）
 - [SDD.md](./SDD.md) — 系統設計文件
 - [ASSESSMENT.md](./ASSESSMENT.md) — 漏洞、業界落差與改善方案
 - [ROADMAP-外送平台.md](./ROADMAP-外送平台.md) — 平台化路線圖

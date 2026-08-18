@@ -101,6 +101,14 @@ namespace Yustore.Controllers
             if (menuItem == null)
                 return NotFound();
 
+            // V-03 修復：原本完全不驗證數量範圍，送 quantity=-1000 可以做出負數訂單總額，
+            // quantity=999999999 則會讓 decimal 欄位溢位而 500。
+            if (quantity < 1 || quantity > 99)
+            {
+                TempData["Error"] = "數量必須介於 1 到 99 之間。";
+                return RedirectToAction("Restaurant", new { id = menuItem.RestaurantId });
+            }
+
             var cartItem = new CartItemViewModel
             {
                 MenuItemId = menuItem.Id,
@@ -202,6 +210,7 @@ namespace Yustore.Controllers
                 order.OrderItems.Add(new OrderItem
                 {
                     MenuItemId = item.MenuItemId,
+                    MenuItemName = item.Name, // 名稱快照，之後餐點被下架也不影響歷史訂單顯示（V-02 修復）
                     Quantity = item.Quantity,
                     UnitPrice = item.Price,
                     Subtotal = item.Subtotal

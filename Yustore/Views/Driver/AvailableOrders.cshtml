@@ -56,7 +56,7 @@
                             <div class="bg-light rounded p-2 mb-3 small">
                                 @foreach (var item in order.OrderItems)
                                 {
-                                    <div>@item.MenuItem?.Name × @item.Quantity</div>
+                                    <div>@(string.IsNullOrEmpty(item.MenuItemName) ? item.MenuItem?.Name : item.MenuItemName) × @item.Quantity</div>
                                 }
                                 <hr class="my-1" />
                                 <div class="d-flex justify-content-between">

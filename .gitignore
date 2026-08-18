@@ -482,3 +482,15 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# ── YUYUEAT 專案專屬規則 ──────────────────────────
+# 使用者上傳內容不進版控（餐點圖片、店家 Logo、送達證明照片等）
+# 用 ** 忽略所有檔案，但保留目錄本身與 .gitkeep，讓乾淨 clone 後資料夾還在
+**/wwwroot/uploads/**
+!**/wwwroot/uploads/**/
+!**/wwwroot/uploads/**/.gitkeep
+
+# appsettings 的環境變體可能含機密，不進版控；
+# 保留 appsettings.json 本身作為範本（不含任何密鑰）
+appsettings.*.json
+!appsettings.json
