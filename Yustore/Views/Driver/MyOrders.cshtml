@@ -1,4 +1,4 @@
-﻿@model List<Yustore.Models.Entities.Delivery>
+﻿@model Yustore.Models.PagedResult<Yustore.Models.Entities.Delivery>
 @using Yustore.Enums
 @{
     ViewData["Title"] = "我的訂單";
@@ -16,7 +16,7 @@
         <a asp-action="Index" class="btn btn-outline-secondary">← 回後台</a>
     </div>
 
-    @if (!Model.Any())
+    @if (!Model.Items.Any())
     {
         <div class="alert alert-info text-center py-4">
             還沒有接過任何訂單。
@@ -24,7 +24,7 @@
     }
     else
     {
-        @foreach (var delivery in Model)
+        @foreach (var delivery in Model.Items)
         {
             <div class="card mb-3 shadow-sm">
                 <div class="card-body">
@@ -85,6 +85,8 @@
                 </div>
             </div>
         }
+
+        @await Html.PartialAsync("_Pagination", (Yustore.Models.IPagedResultMetadata)Model)
     }
 </div>
 

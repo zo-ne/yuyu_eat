@@ -57,12 +57,23 @@ try
         options.Lockout.AllowedForNewUsers = true;
     })
     .AddEntityFrameworkStores<AppDbContext>() // Identity 的資料存到我們的 DB
-    .AddDefaultTokenProviders();              // 啟用 Email 驗證 token 功能
+    .AddDefaultTokenProviders()               // 啟用 Email 驗證 token 功能
+    .AddClaimsPrincipalFactory<AppClaimsPrincipalFactory>(); // M3 修復（P-03）：角色/姓名/Email 放進 Claims
+
+    // M3 修復：EmailSettings 改用 Options Pattern，強型別讀設定
+    builder.Services.Configure<Yustore.Options.EmailSettings>(
+        builder.Configuration.GetSection(Yustore.Options.EmailSettings.SectionName));
 
     // 告訴程式：「當有人需要 IEmailService，就給他 EmailService」
     // Scoped = 每個 HTTP 請求建立一個新的實體
     builder.Services.AddScoped<IEmailService, EmailService>();
     builder.Services.AddScoped<IImageService, ImageService>();
+
+    // M3 修復（P-05）：Controller 不再直接呼叫 SMTP，改成丟進佇列，背景服務慢慢寄。
+    // IEmailQueue 註冊成 Singleton（底層是一個 Channel，本來就該全程式共用同一份），
+    // EmailBackgroundService 在背景持續消費這個佇列。
+    builder.Services.AddSingleton<IEmailQueue, EmailQueue>();
+    builder.Services.AddHostedService<EmailBackgroundService>();
 
     // 啟用 Session
     // Session 需要 MemoryCache 來儲存資料
@@ -76,6 +87,9 @@ try
 
     // 註冊 CartService
     builder.Services.AddScoped<ICartService, CartService>();
+
+    // M3 修復（§3.1 Service 層拆分）
+    builder.Services.AddScoped<IOrderService, OrderService>();
 
     // V-07 修復：Login / Register 加速率限制，防止帳號被拿去大量嘗試密碼或大量灌註冊寄信。
     // 用 IP 當 partition key，同一個 IP 每分鐘最多 5 次請求，超過的直接排隊 0（立刻拒絕）。

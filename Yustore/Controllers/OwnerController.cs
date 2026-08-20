@@ -19,18 +19,21 @@ namespace Yustore.Controllers
         private readonly AppDbContext _db;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IImageService _imageService;
-        private readonly IEmailService _emailService;
+        private readonly IEmailQueue _emailQueue;
+        private readonly IOrderService _orderService;
 
         public OwnerController(
             AppDbContext db,
             UserManager<ApplicationUser> userManager,
             IImageService imageService,
-            IEmailService emailService)
+            IEmailQueue emailQueue,
+            IOrderService orderService)
         {
             _db = db;
             _userManager = userManager;
             _imageService = imageService;
-            _emailService = emailService;
+            _emailQueue = emailQueue;
+            _orderService = orderService;
         }
 
         // ════════════════════════════════════════
@@ -50,7 +53,7 @@ namespace Yustore.Controllers
             if (restaurant == null)
                 return RedirectToAction("SetupRestaurant");
 
-            // 取得最新10筆訂單
+            // 取得最新10筆訂單（給畫面的「最近訂單」清單用）
             var recentOrders = await _db.Orders
                 .Where(o => o.RestaurantId == restaurant.Id)
                 .Include(o => o.Customer)   // Include = 同時載入關聯資料
@@ -62,11 +65,14 @@ namespace Yustore.Controllers
             ViewBag.Restaurant = restaurant;
             ViewBag.RecentOrders = recentOrders;
 
-            // 統計數字
-            ViewBag.TodayOrderCount = recentOrders
-                .Count(o => o.CreatedAt.Date == DateTime.Today);
-            ViewBag.PendingOrderCount = recentOrders
-                .Count(o => o.Status == OrderStatus.Paid);
+            // P-01 修復：統計數字原本是對上面那 10 筆「最近訂單」算的，
+            // 今天真的有 30 張單，後台會顯示「今日訂單：10」。改成對整個資料集分別下
+            // CountAsync()，SQL Server 算 COUNT(*)，不用把資料撈進記憶體。
+            var today = DateTime.Today;
+            ViewBag.TodayOrderCount = await _db.Orders.CountAsync(o =>
+                o.RestaurantId == restaurant.Id && o.CreatedAt >= today && o.CreatedAt < today.AddDays(1));
+            ViewBag.PendingOrderCount = await _db.Orders.CountAsync(o =>
+                o.RestaurantId == restaurant.Id && o.Status == OrderStatus.Paid);
 
             return View();
         }
@@ -302,7 +308,7 @@ namespace Yustore.Controllers
         // ════════════════════════════════════════
 
         // GET: /Owner/Orders
-        public async Task<IActionResult> Orders()
+        public async Task<IActionResult> Orders(int page = 1)
         {
             var user = await _userManager.GetUserAsync(User);
             var restaurant = await _db.Restaurants
@@ -311,6 +317,9 @@ namespace Yustore.Controllers
             if (restaurant == null)
                 return RedirectToAction("SetupRestaurant");
 
+            // M3 修復（§3.2 全站零分頁 / §3.3 唯讀查詢加 AsNoTracking）：
+            // 這個查詢只是顯示訂單列表，狀態變更走 UpdateOrderStatus 另外重查，
+            // 不會用到這裡載入的追蹤實體，AsNoTracking() 是安全的。
             var orders = await _db.Orders
                 .Where(o => o.RestaurantId == restaurant.Id)
                 .Include(o => o.Customer)
@@ -319,47 +328,33 @@ namespace Yustore.Controllers
                 .Include(o => o.Delivery)
                     .ThenInclude(d => d!.Driver)
                 .OrderByDescending(o => o.CreatedAt)
-                .ToListAsync();
+                .AsNoTracking()
+                .ToPagedResultAsync(page);
 
             return View(orders);
         }
 
         // POST: /Owner/UpdateOrderStatus
         // 老闆更新訂單狀態（例如：已付款 → 備餐中）
+        // M3 修復（§3.1 Service 層拆分）：狀態轉換白名單驗證與存檔搬進 IOrderService，
+        // 這裡只負責取得結果、決定要不要寄通知信。
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateOrderStatus(int orderId, OrderStatus newStatus)
         {
-            // V-05 修復：C# 的 enum 參數不做值域驗證，傳 newStatus=99 這種不存在的狀態
-            // 一樣會被模型繫結接受，Enum.IsDefined 先擋掉這種輸入。
-            if (!Enum.IsDefined(typeof(OrderStatus), newStatus))
-                return BadRequest();
-
             var user = await _userManager.GetUserAsync(User);
-            var restaurant = await _db.Restaurants
-                .FirstOrDefaultAsync(r => r.OwnerId == user!.Id);
+            var result = await _orderService.UpdateOwnerStatusAsync(orderId, user!.Id, newStatus);
 
-            var order = await _db.Orders
-                .Include(o => o.Customer)
-                .FirstOrDefaultAsync(o => o.Id == orderId && o.RestaurantId == restaurant!.Id);
-
-            if (order == null)
-                return NotFound();
-
-            // V-05 修復：只允許白名單內的狀態轉換，老闆不能把「待付款」直接改成「完成」繞過付款，
-            // 也不能把「已送達」改回「待付款」。
-            if (!OrderStatusTransitions.CanOwnerTransition(order.Status, newStatus))
+            if (!result.Success)
             {
-                TempData["Error"] = $"無法把訂單從「{order.Status.GetDisplayName()}」改成「{newStatus.GetDisplayName()}」。";
+                if (result.FailureReason == StatusUpdateFailureReason.NotFound)
+                    return NotFound();
+
+                TempData["Error"] = result.ErrorMessage;
                 return RedirectToAction("Orders");
             }
 
-            order.Status = newStatus;
-
-            // 訂單狀態一定要先存檔成功，寄信失敗不該連帶讓狀態更新消失
-            // （原本存檔放在寄信迴圈之後：如果第 50 封信拋例外，SaveChangesAsync 永遠不會執行，
-            //  狀態更新整個丟失，但前 49 位外送師已經收到「有新單」的通知——這是 P-05 的一部分）
-            await _db.SaveChangesAsync();
+            var order = result.Order!;
 
             // 如果狀態改成「待取餐」，寄 Email 通知外送師
             if (newStatus == OrderStatus.ReadyForPickup)
@@ -377,9 +372,12 @@ namespace Yustore.Controllers
                 // 等於允許顧客把姓名/地址設成 <a href="...">釣魚連結</a>，用平台自己的網域寄出去。
                 var safeAddress = System.Net.WebUtility.HtmlEncode(order.DeliveryAddress);
 
+                // M3 修復（P-05）：原本在這個 foreach 裡逐一同步呼叫 SMTP，100 個外送師
+                // 就是 100 次同步連線，老闆按一個按鈕要等好幾分鐘，HTTP 請求全程被卡住。
+                // 現在只是把訊息丟進記憶體佇列，這個迴圈幾乎是瞬間跑完。
                 foreach (var driver in drivers)
                 {
-                    await _emailService.SendEmailAsync(
+                    await _emailQueue.EnqueueAsync(new EmailMessage(
                         driver.Email!,
                         "【YUYUEAT】新訂單可以接單！",
                         $@"<h2>有新訂單可以接！</h2>
@@ -391,7 +389,7 @@ namespace Yustore.Controllers
                                  點我接單
                               </a>
                            </p>"
-                    );
+                    ));
                 }
             }
 

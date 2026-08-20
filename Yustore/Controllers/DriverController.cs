@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Yustore.Data;
 using Yustore.Enums;
+using Yustore.Extensions;
 using Yustore.Filters;
 using Yustore.Models.Entities;
 using Yustore.Services;
@@ -66,9 +67,11 @@ namespace Yustore.Controllers
         // ════════════════════════════════════════
 
         // GET: /Driver/AvailableOrders
-        public async Task<IActionResult> AvailableOrders()
+        public async Task<IActionResult> AvailableOrders(int page = 1)
         {
             // 找出所有「待取餐」且還沒有外送師接的訂單
+            // （M3 修復：加分頁 §3.2；AsNoTracking §3.3——AcceptOrder 用 ExecuteUpdateAsync
+            //   走另一條原子更新路徑，不依賴這裡載入的追蹤實體）
             var orders = await _db.Orders
                 .Where(o => o.Status == OrderStatus.ReadyForPickup
                     && o.Delivery == null) // 還沒有人接
@@ -76,7 +79,8 @@ namespace Yustore.Controllers
                 .Include(o => o.Customer)
                 .Include(o => o.OrderItems)
                 .OrderBy(o => o.CreatedAt) // 先進先出
-                .ToListAsync();
+                .AsNoTracking()
+                .ToPagedResultAsync(page);
 
             return View(orders);
         }
@@ -132,10 +136,11 @@ namespace Yustore.Controllers
         // 我的訂單（進行中）
         // ════════════════════════════════════════
 
-        public async Task<IActionResult> MyOrders()
+        public async Task<IActionResult> MyOrders(int page = 1)
         {
             var user = await _userManager.GetUserAsync(User);
 
+            // M3 修復（§3.2 全站零分頁 / §3.3 唯讀查詢加 AsNoTracking）
             var deliveries = await _db.Deliveries
                 .Where(d => d.DriverId == user!.Id)
                 .Include(d => d.Order)
@@ -146,7 +151,8 @@ namespace Yustore.Controllers
                     .ThenInclude(o => o.OrderItems)
                         .ThenInclude(oi => oi.MenuItem)
                 .OrderByDescending(d => d.Order.CreatedAt)
-                .ToListAsync();
+                .AsNoTracking()
+                .ToPagedResultAsync(page);
 
             return View(deliveries);
         }

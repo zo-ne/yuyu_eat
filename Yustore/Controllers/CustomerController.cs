@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Yustore.Data;
 using Yustore.Enums;
+using Yustore.Extensions;
 using Yustore.Filters;
 using Yustore.Models.Entities;
 using Yustore.Services;
@@ -16,22 +17,25 @@ namespace Yustore.Controllers
         private readonly AppDbContext _db;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ICartService _cartService;
+        private readonly IOrderService _orderService;
 
         public CustomerController(
             AppDbContext db,
             UserManager<ApplicationUser> userManager,
-            ICartService cartService)
+            ICartService cartService,
+            IOrderService orderService)
         {
             _db = db;
             _userManager = userManager;
             _cartService = cartService;
+            _orderService = orderService;
         }
 
         // ════════════════════════════════════════
         // 首頁：瀏覽店家
         // ════════════════════════════════════════
 
-        public async Task<IActionResult> Index(string? search)
+        public async Task<IActionResult> Index(string? search, int page = 1)
         {
             // IQueryable = 還沒真正執行查詢，可以繼續加條件
             var query = _db.Restaurants
@@ -46,9 +50,14 @@ namespace Yustore.Controllers
                     r.Description!.Contains(search));
             }
 
+            // M3 修復（§3.2 全站零分頁 / §3.3 唯讀查詢加 AsNoTracking）：
+            // 店家一多，一次把全部撈出來的成本會愈來愈高；這個查詢單純顯示用，不會被存回去，
+            // AsNoTracking() 讓 EF Core 不用花力氣追蹤變更。
             var restaurants = await query
                 .Include(r => r.Owner)
-                .ToListAsync();
+                .OrderBy(r => r.Id) // 分頁一定要有明確排序，不然每頁的順序不保證穩定
+                .AsNoTracking()
+                .ToPagedResultAsync(page);
 
             ViewBag.Search = search;
             return View(restaurants);
@@ -68,15 +77,15 @@ namespace Yustore.Controllers
             if (restaurant == null)
                 return NotFound();
 
-            // 取得這家店的評分
-            var reviews = await _db.Reviews
-                .Where(r => r.TargetUserId == restaurant.OwnerId)
-                .ToListAsync();
+            // P-02 修復：原本把這家店收到的「全部」評價都撈進記憶體才算平均，
+            // 一萬則評價就是一萬個物件。改成讓 SQL Server 直接算 COUNT/AVG，
+            // 不管評價有多少筆，這裡都只有一趟查詢、幾乎零記憶體開銷。
+            var reviewsForOwner = _db.Reviews.Where(r => r.TargetUserId == restaurant.OwnerId);
 
-            ViewBag.AverageRating = reviews.Any()
-                ? Math.Round(reviews.Average(r => r.Stars), 1)
+            ViewBag.ReviewCount = await reviewsForOwner.CountAsync();
+            ViewBag.AverageRating = ViewBag.ReviewCount > 0
+                ? Math.Round(await reviewsForOwner.AverageAsync(r => r.Stars), 1)
                 : 0;
-            ViewBag.ReviewCount = reviews.Count;
 
             // 取得目前購物車（顯示已選數量用）
             var cart = _cartService.GetCart(HttpContext);
@@ -170,6 +179,8 @@ namespace Yustore.Controllers
         }
 
         // POST: 確認下單
+        // M3 修復（§3.1 Service 層拆分）：結帳的重新驗價/建單邏輯搬進 IOrderService，
+        // 這裡只負責處理 HTTP 層的事（讀購物車、驗證表單、依結果決定要導去哪一頁、清購物車）。
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Checkout(CheckoutViewModel model)
@@ -185,96 +196,20 @@ namespace Yustore.Controllers
             if (!ModelState.IsValid)
                 return View(model);
 
-            // V-04 修復：購物車裡的 Price 是「加入購物車當下」的快照，Session 有 30 分鐘壽命，
-            // 這段期間老闆可能漲價、下架、甚至刪除餐點。結帳這一刻要重新查資料庫，
-            // 用資料庫目前的價格與供應狀態為準，不能相信 Session 裡的舊資料。
-            var menuItemIds = cart.Items.Select(i => i.MenuItemId).ToList();
-            var freshMenuItems = await _db.MenuItems
-                .Where(m => menuItemIds.Contains(m.Id))
-                .ToDictionaryAsync(m => m.Id);
-
-            var invalidItems = cart.Items.Where(item =>
-                !freshMenuItems.TryGetValue(item.MenuItemId, out var menuItem) ||
-                !menuItem.IsAvailable ||
-                menuItem.RestaurantId != cart.RestaurantId).ToList();
-
-            if (invalidItems.Any())
-            {
-                TempData["Error"] = "購物車裡有餐點已經下架、售完或不屬於這家店，請重新確認後再結帳。";
-                return RedirectToAction("Cart");
-            }
-
             var user = await _userManager.GetUserAsync(User);
+            var result = await _orderService.CheckoutAsync(user!.Id, cart, model.DeliveryAddress, model.Note);
 
-            // 產生訂單編號：ORD-日期 + 資料庫自增序號，避免 Random 碰撞（V-10 修復）
-            var orderNumber = await GenerateOrderNumberAsync();
-
-            // 用資料庫目前的價格重新計算，不採用購物車裡的快照價格
-            var orderItems = cart.Items.Select(item =>
+            if (!result.Success)
             {
-                var menuItem = freshMenuItems[item.MenuItemId];
-                return new OrderItem
-                {
-                    MenuItemId = menuItem.Id,
-                    MenuItemName = menuItem.Name, // 名稱快照，之後餐點被下架也不影響歷史訂單顯示（V-02 修復）
-                    Quantity = item.Quantity,
-                    UnitPrice = menuItem.Price,
-                    Subtotal = menuItem.Price * item.Quantity
-                };
-            }).ToList();
-
-            var foodTotal = orderItems.Sum(i => i.Subtotal);
-            const decimal deliveryFee = 30; // 目前固定外送費，之後動態外送費上線時改成伺服器端計算
-
-            var order = new Order
-            {
-                OrderNumber = orderNumber,
-                Status = OrderStatus.PendingPayment,
-                FoodTotal = foodTotal,
-                DeliveryFee = deliveryFee,
-                GrandTotal = foodTotal + deliveryFee,
-                DeliveryAddress = model.DeliveryAddress,
-                Note = model.Note,
-                CustomerId = user!.Id,
-                RestaurantId = cart.RestaurantId
-            };
-
-            foreach (var orderItem in orderItems)
-                order.OrderItems.Add(orderItem);
-
-            // 建單整段包一個 transaction；OrderNumber 有 unique 索引兜底，
-            // 極端情況下（同一秒有其他訂單搶到同一個序號）寧可讓這次結帳失敗、請顧客重試，
-            // 也不要讓兩張訂單共用同一個編號。
-            using var transaction = await _db.Database.BeginTransactionAsync();
-            try
-            {
-                _db.Orders.Add(order);
-                await _db.SaveChangesAsync();
-                await transaction.CommitAsync();
-            }
-            catch (DbUpdateException)
-            {
-                await transaction.RollbackAsync();
-                TempData["Error"] = "系統忙線中，訂單建立失敗，請重新結帳一次。";
-                return RedirectToAction("Checkout");
+                TempData["Error"] = result.ErrorMessage;
+                return RedirectToAction("Cart");
             }
 
             // 清空購物車
             _cartService.ClearCart(HttpContext);
 
             // 跳到模擬付款頁面
-            return RedirectToAction("Payment", new { orderId = order.Id });
-        }
-
-        // V-10 修復：原本用 $"ORD-{yyyyMMdd}-{new Random().Next(1000, 9999)}"，
-        // 同一天只有 8999 種可能，約 112 筆訂單就有 50% 機率碰撞，且 DB 沒有 unique 約束不會報錯，
-        // 只會安靜地產生兩張一樣編號的訂單。改成「當天序號」：查當天已有幾筆訂單，用下一號補零到 6 碼，
-        // 搭配 Order.OrderNumber 的 unique 索引（見 AppDbContext），萬一真的撞號會直接讓交易失敗而不是悄悄重複。
-        private async Task<string> GenerateOrderNumberAsync()
-        {
-            var today = DateTime.Now.Date;
-            var todayCount = await _db.Orders.CountAsync(o => o.CreatedAt >= today && o.CreatedAt < today.AddDays(1));
-            return $"ORD-{DateTime.Now:yyyyMMdd}-{(todayCount + 1):D6}";
+            return RedirectToAction("Payment", new { orderId = result.Order!.Id });
         }
 
         // ════════════════════════════════════════
@@ -306,15 +241,10 @@ namespace Yustore.Controllers
         public async Task<IActionResult> ConfirmPayment(int orderId)
         {
             var user = await _userManager.GetUserAsync(User);
-            var order = await _db.Orders
-                .FirstOrDefaultAsync(o => o.Id == orderId && o.CustomerId == user!.Id);
+            var order = await _orderService.ConfirmPaymentAsync(orderId, user!.Id);
 
             if (order == null)
                 return NotFound();
-
-            // 模擬付款成功：狀態改為「已付款」
-            order.Status = OrderStatus.Paid;
-            await _db.SaveChangesAsync();
 
             TempData["Message"] = $"✅ 付款成功！訂單編號：{order.OrderNumber}";
             return RedirectToAction("OrderDetail", new { orderId = order.Id });
