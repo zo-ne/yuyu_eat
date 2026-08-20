@@ -494,3 +494,6 @@ $RECYCLE.BIN/
 # 保留 appsettings.json 本身作為範本（不含任何密鑰）
 appsettings.*.json
 !appsettings.json
+
+# Serilog 寫的日誌檔（M2）
+**/logs/*.log

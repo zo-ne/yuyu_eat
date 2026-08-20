@@ -1,0 +1,40 @@
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${DB_SA_PASSWORD:?請先複製 .env.example 成 .env 並設定 DB_SA_PASSWORD}"
+    ports:
+      - "1433:1433"
+    volumes:
+      - db-data:/var/opt/mssql
+    healthcheck:
+      # app 要等資料庫真的能接受連線才能啟動（不然第一次自動 migrate 會失敗）
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  app:
+    build:
+      context: .
+      dockerfile: Yustore/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: "http://+:8080"
+      # 用 __ 分隔巢狀設定鍵，對應 appsettings.json 的 ConnectionStrings:DefaultConnection
+      ConnectionStrings__DefaultConnection: "Server=db;Database=Yustore;User Id=sa;Password=${DB_SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=true"
+      EmailSettings__AppPassword: "${EMAIL_APP_PASSWORD:-}"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # 圖片上傳落在容器裡的路徑，掛成 volume 才不會 docker compose down 之後就消失
+      - uploads-data:/app/wwwroot/uploads
+
+volumes:
+  db-data:
+  uploads-data:

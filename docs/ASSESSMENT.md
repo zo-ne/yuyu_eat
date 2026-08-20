@@ -392,6 +392,8 @@ wwwroot/uploads/menu/…{png,HEIC}
 | V-17 | 🟢 Low | appsettings.json 在版控且無機密管理規範 | appsettings.json | ✅ 已修復（M0） |
 
 > 狀態欄更新於 M1 完成時（分支 `m1-security-hardening`）。M0/M1 涵蓋本文件列出的全部 17 項漏洞；順便處理了 enum 改英文命名、`RoleRequiredAttribute` 合併（P-07）、P-05 的存檔順序問題。**尚未處理**：P-01（老闆後台統計數字錯誤）、P-02~P-04、P-06 等其餘 §2 效能項目，留到 M3 架構重構階段，詳見 [PRD-v2.md](./PRD-v2.md) 里程碑表。
+>
+> M2（`m2-engineering-practices` 分支）另外補上：Docker/docker-compose、xUnit 單元測試（43 個，覆蓋 §6 建議的購物車/狀態機/評價授權邏輯）、GitHub Actions CI、Serilog 結構化日誌、`.editorconfig` + `Directory.Build.props`（`TreatWarningsAsErrors`）。§3.2 表格裡「自動化測試」「CI/CD」兩項落差已補上；「分層架構」仍是 M3 的工作。
 
 **做對的地方**(這些要在面試時講出來):
 - ✅ 全域 `AuthorizeFilter` fail-closed 預設拒絕 — 比大多數學習專案好

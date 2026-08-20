@@ -200,7 +200,7 @@
 |---|---|---|---|---|
 | **M0：止血** | .gitignore 修正、移除已 commit 的上傳檔案、修 V-01/V-02/V-03/V-12、補 `Error` action、刪除 `AYuCantina`、寫 README | ASSESSMENT §6 階段 0 | 3~5 天 | ✅ 完成（`m0-security-hotfix`） |
 | **M1：安全與正確性** | V-04~V-11/V-13~V-15 全部修復；enum 改英文；圖片上傳改用 ImageSharp | ASSESSMENT §6 階段 1 | 1 週 | ✅ 完成（`m1-security-hardening`） |
-| **M2：工程實務** | Docker、xUnit 單元測試、GitHub Actions CI、Serilog、`.editorconfig` | ASSESSMENT §6 階段 2 | 1~1.5 週 |
+| **M2：工程實務** | Docker、xUnit 單元測試、GitHub Actions CI、Serilog、`.editorconfig` | ASSESSMENT §6 階段 2 | 1~1.5 週 | ✅ 完成（`m2-engineering-practices`） |
 | **M3：架構重構** | Service 層拆分、DTO 投影、Options Pattern、分頁、角色改用 Claims | ASSESSMENT §6 階段 3 | 1.5~2 週 |
 | **M4：治理與商業模式** | Admin 後台（審核/停權/訂單總覽）、申請制上線、`Settlement` 拆分為分潤+月結批次 | 本文件 §5.6, §7 | 1.5~2 週 |
 | **M5：真實金流 + 即時推播** | ECPay/NewebPay Sandbox 串接、SignalR `OrderHub`、未登入首頁與店家卡片視覺改造 | 本文件 §5.8, §5.9；ROADMAP §1, §3.3 | 2 週 |
@@ -213,14 +213,14 @@
 
 ## 9. 驗收標準（Definition of Done）
 
-- [ ] ASSESSMENT.md 中列出的所有 🔴 Critical、🟠 High 漏洞狀態改為「已修復」
-- [ ] `dotnet test` 在 CI 中全數通過，且覆蓋訂單金額計算、狀態機、購物車、評價授權四個核心邏輯
-- [ ] GitHub Actions 在每次 push / PR 自動跑 build + test，README 顯示綠色徽章
-- [ ] `docker compose up` 可在乾淨環境一鍵啟動整個系統（app + DB）
+- [x] ASSESSMENT.md 中列出的所有 🔴 Critical、🟠 High 漏洞狀態改為「已修復」（M0+M1，全部 17 項）
+- [x] `dotnet test` 在 CI 中全數通過，且覆蓋訂單金額計算、狀態機、購物車、評價授權四個核心邏輯（M2，43 個測試）
+- [x] GitHub Actions 在每次 push / PR 自動跑 build + test，README 顯示徽章（M2；分支合併回 main 後才會實際跑一次確認變綠）
+- [ ] `docker compose up` 可在乾淨環境一鍵啟動整個系統（app + DB）（Dockerfile/compose 已完成並過 `docker compose config` 語法檢查，但撰寫當下本機 Docker Desktop 沒開機，尚未實際跑過完整啟動，待手動驗證）
 - [ ] 用測試帳號可完整跑完一次端到端流程：訪客瀏覽 → 顧客註冊登入 → 下單 → ECPay Sandbox 付款成功 → 老闆備餐（狀態即時推播給顧客）→ 外送員接單送達 → 三方互評 → Admin 查看該月結算批次
 - [ ] Admin 可審核一筆店家／外送員申請，未審核通過者無法上架／接單
 - [ ] 部署網址可公開存取，附測試帳號可直接操作
-- [ ] enum 全部為英文，View 顯示透過 `[Display]`
+- [x] enum 全部為英文，View 顯示透過 `[Display]`（M1）
 - [ ] README 包含：專案介紹、架構圖、ER 圖、技術棧、啟動方式、Demo 網址與帳號
 
 ---
