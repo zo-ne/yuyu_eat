@@ -1,0 +1,88 @@
+@model Yustore.Models.PagedResult<Yustore.Models.Entities.Order>
+@{
+    ViewData["Title"] = "全平台訂單總覽";
+    var status = ViewBag.Status as OrderStatus?;
+    var from = ViewBag.From as DateTime?;
+    var to = ViewBag.To as DateTime?;
+    var restaurantId = ViewBag.RestaurantId as int?;
+}
+
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>🧾 全平台訂單總覽</h3>
+        <a asp-action="Index" class="btn btn-outline-secondary">← 回後台</a>
+    </div>
+
+    <form asp-action="Orders" method="get" class="row g-2 mb-4">
+        <div class="col-auto">
+            <select name="status" class="form-select form-select-sm">
+                <option value="">全部狀態</option>
+                @foreach (var s in Enum.GetValues<OrderStatus>())
+                {
+                    <option value="@((int)s)" selected="@(status == s)">@s.GetDisplayName()</option>
+                }
+            </select>
+        </div>
+        <div class="col-auto">
+            <input type="date" name="from" class="form-control form-control-sm"
+                   value="@(from?.ToString("yyyy-MM-dd"))" placeholder="起始日期" />
+        </div>
+        <div class="col-auto">
+            <input type="date" name="to" class="form-control form-control-sm"
+                   value="@(to?.ToString("yyyy-MM-dd"))" placeholder="結束日期" />
+        </div>
+        <div class="col-auto">
+            <input type="number" name="restaurantId" class="form-control form-control-sm"
+                   value="@restaurantId" placeholder="店家 ID" />
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary btn-sm">篩選</button>
+            <a asp-action="Orders" class="btn btn-outline-secondary btn-sm">清除</a>
+        </div>
+    </form>
+
+    @if (!Model.Items.Any())
+    {
+        <div class="alert alert-info">沒有符合條件的訂單。</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>訂單編號</th>
+                        <th>店家</th>
+                        <th>顧客</th>
+                        <th>金額</th>
+                        <th>狀態</th>
+                        <th>建立時間</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var order in Model.Items)
+                    {
+                        <tr>
+                            <td>@order.OrderNumber</td>
+                            <td>@order.Restaurant?.Name</td>
+                            <td>@order.Customer?.FullName</td>
+                            <td>$@order.GrandTotal</td>
+                            <td><span class="badge bg-secondary">@order.Status.GetDisplayName()</span></td>
+                            <td>@order.CreatedAt.ToString("yyyy/MM/dd HH:mm")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @await Html.PartialAsync("_Pagination", (Yustore.Models.IPagedResultMetadata)Model,
+            new ViewDataDictionary(ViewData) { ["RouteValues"] = new RouteValueDictionary
+            {
+                ["status"] = status.HasValue ? (int?)status : null,
+                ["from"] = from?.ToString("yyyy-MM-dd"),
+                ["to"] = to?.ToString("yyyy-MM-dd"),
+                ["restaurantId"] = restaurantId
+            } })
+    }
+</div>

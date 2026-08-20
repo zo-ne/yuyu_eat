@@ -28,6 +28,8 @@ services:
       # 用 __ 分隔巢狀設定鍵，對應 appsettings.json 的 ConnectionStrings:DefaultConnection
       ConnectionStrings__DefaultConnection: "Server=db;Database=Yustore;User Id=sa;Password=${DB_SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=true"
       EmailSettings__AppPassword: "${EMAIL_APP_PASSWORD:-}"
+      AdminSeed__Email: "${ADMIN_SEED_EMAIL:-}"
+      AdminSeed__Password: "${ADMIN_SEED_PASSWORD:-}"
     depends_on:
       db:
         condition: service_healthy

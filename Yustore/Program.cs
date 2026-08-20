@@ -1,4 +1,5 @@
 using Yustore.Data;
+using Yustore.Enums;
 using Yustore.Models.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -93,6 +94,7 @@ try
     builder.Services.AddScoped<IRestaurantService, RestaurantService>();
     builder.Services.AddScoped<ISettlementService, SettlementService>();
     builder.Services.AddScoped<IReviewService, ReviewService>();
+    builder.Services.AddScoped<IAdminService, AdminService>(); // M4 修復（§5.6）
 
     // V-07 修復：Login / Register 加速率限制，防止帳號被拿去大量嘗試密碼或大量灌註冊寄信。
     // 用 IP 當 partition key，同一個 IP 每分鐘最多 5 次請求，超過的直接排隊 0（立刻拒絕）。
@@ -134,6 +136,47 @@ try
         catch (Exception ex)
         {
             Log.Error(ex, "自動套用 migration 失敗，請確認資料庫連線設定是否正確");
+        }
+    }
+
+    // M4 新增（§5.6）：Admin 沒有自助註冊入口，帳號只能用這種方式建立。
+    // 密碼走設定/環境變數（AdminSeed:Password，對應 .env 的 ADMIN_SEED_PASSWORD），
+    // 不寫死在程式碼裡；只有帳號真的還不存在時才建立，重複啟動不會重灌密碼。
+    using (var scope = app.Services.CreateScope())
+    {
+        try
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            // docker-compose 沒設定 .env 值時會傳空字串進來，不是 null，?? 接不住，要另外判斷。
+            var adminEmailSetting = builder.Configuration["AdminSeed:Email"];
+            var adminPasswordSetting = builder.Configuration["AdminSeed:Password"];
+            var adminEmail = string.IsNullOrWhiteSpace(adminEmailSetting) ? "admin@yuyueat.local" : adminEmailSetting;
+            var adminPassword = string.IsNullOrWhiteSpace(adminPasswordSetting) ? "ChangeMe123!" : adminPasswordSetting;
+
+            if (await userManager.FindByEmailAsync(adminEmail) == null)
+            {
+                var admin = new ApplicationUser
+                {
+                    UserName = adminEmail,
+                    Email = adminEmail,
+                    FullName = "平台管理員",
+                    Role = UserRole.Admin,
+                    IsActive = true,
+                    ApplicationStatus = ApplicationStatus.Approved,
+                    EmailConfirmed = true // Admin 是後端建立的，不用走信箱驗證流程
+                };
+
+                var result = await userManager.CreateAsync(admin, adminPassword);
+                if (result.Succeeded)
+                    Log.Information("已建立預設 Admin 帳號：{Email}", adminEmail);
+                else
+                    Log.Warning("建立預設 Admin 帳號失敗：{Errors}",
+                        string.Join("; ", result.Errors.Select(e => e.Description)));
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Seed Admin 帳號時發生例外");
         }
     }
 

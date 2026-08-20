@@ -223,14 +223,15 @@ namespace Yustore.Controllers
             // 更新訂單狀態為「已送達」
             delivery.Order.Status = OrderStatus.Delivered;
 
-            // 建立結算記錄（M3 修復 §3.1：搬進 ISettlementService）。
+            // 建立分潤明細（M3 修復 §3.1：搬進 ISettlementService；M4 修復：Settlement 拆成
+            // OrderTransaction + SettlementBatch，餐費依 15% 平台抽成拆分給店家）。
             // 這裡刻意不先呼叫 SaveChangesAsync：DriverController 跟 SettlementService
             // 共用同一個（Scoped）DbContext，delivery/order 的變更已經在追蹤中，
             // CreateForDeliveryAsync 內部的 SaveChangesAsync 會把兩邊的異動一起存檔，
-            // 維持「送達狀態」跟「結算記錄」這兩件事原子性地同時成功或同時失敗。
-            // 外送師收了顧客的現金，餐費部分要月底結算給老闆
+            // 維持「送達狀態」跟「分潤明細」這兩件事原子性地同時成功或同時失敗。
             await _settlementService.CreateForDeliveryAsync(
-                delivery.Order.Id, delivery.Order.RestaurantId, delivery.Order.FoodTotal, user!.Id);
+                delivery.Order.Id, delivery.Order.RestaurantId,
+                delivery.Order.FoodTotal, delivery.Order.DeliveryFee, user!.Id);
 
             TempData["Message"] = "✅ 訂單完成！結算記錄已建立。";
             return RedirectToAction("MyOrders");
