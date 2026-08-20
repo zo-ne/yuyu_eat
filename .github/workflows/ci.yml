@@ -4,7 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # 沒限制 branches：專案用堆疊式 PR（M1 PR 對 M0 分支開、M2 對 M1 開，以此類推），
+    # 若只放行 base=main 的 PR，中間這些堆疊 PR 永遠不會觸發 CI。
+    branches: ["**"]
 
 jobs:
   build-and-test:
