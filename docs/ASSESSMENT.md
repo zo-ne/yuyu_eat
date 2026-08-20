@@ -393,7 +393,9 @@ wwwroot/uploads/menu/…{png,HEIC}
 
 > 狀態欄更新於 M1 完成時（分支 `m1-security-hardening`）。M0/M1 涵蓋本文件列出的全部 17 項漏洞；順便處理了 enum 改英文命名、`RoleRequiredAttribute` 合併（P-07）、P-05 的存檔順序問題。**尚未處理**：P-01（老闆後台統計數字錯誤）、P-02~P-04、P-06 等其餘 §2 效能項目，留到 M3 架構重構階段，詳見 [PRD-v2.md](./PRD-v2.md) 里程碑表。
 >
-> M2（`m2-engineering-practices` 分支）另外補上：Docker/docker-compose、xUnit 單元測試（43 個，覆蓋 §6 建議的購物車/狀態機/評價授權邏輯）、GitHub Actions CI、Serilog 結構化日誌、`.editorconfig` + `Directory.Build.props`（`TreatWarningsAsErrors`）。§3.2 表格裡「自動化測試」「CI/CD」兩項落差已補上；「分層架構」仍是 M3 的工作。
+> M2（`m2-engineering-practices` 分支）另外補上：Docker/docker-compose、xUnit 單元測試（43 個，覆蓋 §6 建議的購物車/狀態機/評價授權邏輯）、GitHub Actions CI、Serilog 結構化日誌、`.editorconfig` + `Directory.Build.props`（`TreatWarningsAsErrors`）。§3.2 表格裡「自動化測試」「CI/CD」兩項落差已補上。
+>
+> M3（`m3-architecture-refactor` 分支，部分完成）補上：P-01/P-02/P-05/P-07、Options Pattern（`EmailSettings`）、角色改用 Claims（`_Layout`/`RoleRequiredAttribute` 零多餘 DB 查詢）、全站分頁（4 個列表頁）、`IOrderService`（訂單網域的 Service 層拆分，含 11 個單元測試，累計 54 個）。§3.2 表格裡「分層架構」落差**部分**補上——訂單網域抽出來了，`Restaurant`/`Settlement`/`Review` 還沒有獨立 Service，詳見 [PRD-v2.md §8「M3 完成範圍說明」](./PRD-v2.md#m3-完成範圍說明)。
 
 **做對的地方**(這些要在面試時講出來):
 - ✅ 全域 `AuthorizeFilter` fail-closed 預設拒絕 — 比大多數學習專案好

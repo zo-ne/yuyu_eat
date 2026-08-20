@@ -16,16 +16,16 @@ namespace Yustore.Controllers
         // 不用自己 new 物件，ASP.NET 會自動幫你建立並傳進來
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
-        private readonly IEmailService _emailService;
+        private readonly IEmailQueue _emailQueue;
 
         public AccountController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
-            IEmailService emailService)
+            IEmailQueue emailQueue)
         {
             _userManager = userManager;
             _signInManager = signInManager;
-            _emailService = emailService;
+            _emailQueue = emailQueue;
         }
 
         // ────────────────────────────────────────
@@ -90,8 +90,9 @@ namespace Yustore.Controllers
                 // confirmUrl 是伺服器用 Url.Action 產生的，不是使用者輸入，不需要編碼。
                 var safeFullName = System.Net.WebUtility.HtmlEncode(user.FullName);
 
-                // 寄驗證信
-                await _emailService.SendEmailAsync(
+                // M3 修復（P-05）：丟進佇列就回應，不用等 SMTP 連線/寄送完成，
+                // 註冊表單送出的速度不會被 Gmail SMTP 的延遲拖累。
+                await _emailQueue.EnqueueAsync(new EmailMessage(
                     user.Email,
                     "【YUYUEAT】請驗證您的 Email",
                     $@"<h2>歡迎加入YUYUEAT！</h2>
@@ -103,7 +104,7 @@ namespace Yustore.Controllers
                           驗證我的帳號
                        </a>
                        <p>若您沒有註冊YUYUEAT，請忽略此信。</p>"
-                );
+                ));
 
                 // 跳到「請去收信」提示頁面
                 TempData["Message"] = user.IsActive

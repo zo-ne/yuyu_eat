@@ -1,4 +1,4 @@
-﻿@model List<Yustore.Models.Entities.Restaurant>
+﻿@model Yustore.Models.PagedResult<Yustore.Models.Entities.Restaurant>
 @{
     ViewData["Title"] = "探索店家";
 }
@@ -28,7 +28,7 @@
         </div>
     </form>
 
-    @if (!Model.Any())
+    @if (!Model.Items.Any())
     {
         <div class="alert alert-info">
             @if (!string.IsNullOrEmpty(ViewBag.Search as string))
@@ -44,7 +44,7 @@
     else
     {
         <div class="row g-4">
-            @foreach (var restaurant in Model)
+            @foreach (var restaurant in Model.Items)
             {
                 <div class="col-md-4">
                     <a asp-action="Restaurant" asp-route-id="@restaurant.Id"
@@ -80,6 +80,9 @@
                 </div>
             }
         </div>
+
+        @await Html.PartialAsync("_Pagination", (Yustore.Models.IPagedResultMetadata)Model,
+            new ViewDataDictionary(ViewData) { ["RouteValues"] = new RouteValueDictionary { ["search"] = ViewBag.Search } })
     }
 </div>
 

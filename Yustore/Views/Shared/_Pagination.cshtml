@@ -1,0 +1,40 @@
+@* 共用分頁元件。呼叫端：
+     @await Html.PartialAsync("_Pagination", (Yustore.Models.IPagedResultMetadata)Model,
+         new ViewDataDictionary(ViewData) { ["RouteValues"] = new RouteValueDictionary { ["search"] = ViewBag.Search } })
+   ViewData["RouteValues"] 放要跟著分頁連結一起保留的其他 querystring（例如搜尋關鍵字）；沒有的話就不用傳。 *@
+@model Yustore.Models.IPagedResultMetadata
+
+@if (Model.TotalPages > 1)
+{
+    var baseRoute = ViewData["RouteValues"] as RouteValueDictionary ?? new RouteValueDictionary();
+
+    <nav aria-label="分頁導覽" class="d-flex justify-content-center mt-4">
+        <ul class="pagination">
+            <li class="page-item @(Model.HasPreviousPage ? "" : "disabled")">
+                <a class="page-link" asp-all-route-data="@Merge(baseRoute, Model.PageNumber - 1)">‹ 上一頁</a>
+            </li>
+
+            @for (var i = 1; i <= Model.TotalPages; i++)
+            {
+                <li class="page-item @(i == Model.PageNumber ? "active" : "")">
+                    <a class="page-link" asp-all-route-data="@Merge(baseRoute, i)">@i</a>
+                </li>
+            }
+
+            <li class="page-item @(Model.HasNextPage ? "" : "disabled")">
+                <a class="page-link" asp-all-route-data="@Merge(baseRoute, Model.PageNumber + 1)">下一頁 ›</a>
+            </li>
+        </ul>
+    </nav>
+}
+
+@functions {
+    private static Dictionary<string, string> Merge(RouteValueDictionary baseRoute, int page)
+    {
+        var result = baseRoute
+            .Where(kv => kv.Value != null)
+            .ToDictionary(kv => kv.Key, kv => kv.Value!.ToString()!);
+        result["page"] = page.ToString();
+        return result;
+    }
+}

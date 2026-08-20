@@ -1,4 +1,4 @@
-﻿@model List<Yustore.Models.Entities.Order>
+﻿@model Yustore.Models.PagedResult<Yustore.Models.Entities.Order>
 @{
     ViewData["Title"] = "可接訂單";
 }
@@ -15,7 +15,7 @@
         <a asp-action="Index" class="btn btn-outline-secondary">← 回後台</a>
     </div>
 
-    @if (!Model.Any())
+    @if (!Model.Items.Any())
     {
         <div class="alert alert-info text-center py-5">
             <h5>目前沒有可接的訂單</h5>
@@ -29,7 +29,7 @@
     else
     {
         <div class="row g-3">
-            @foreach (var order in Model)
+            @foreach (var order in Model.Items)
             {
                 <div class="col-md-6">
                     <div class="card shadow-sm border-warning">
@@ -80,5 +80,7 @@
                 </div>
             }
         </div>
+
+        @await Html.PartialAsync("_Pagination", (Yustore.Models.IPagedResultMetadata)Model)
     }
 </div>
