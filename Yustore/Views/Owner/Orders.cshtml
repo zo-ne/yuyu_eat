@@ -52,7 +52,7 @@
                             @foreach (var item in order.OrderItems)
                             {
                                 <div class="d-flex justify-content-between">
-                                    <span>@item.MenuItem?.Name × @item.Quantity</span>
+                                    <span>@(string.IsNullOrEmpty(item.MenuItemName) ? item.MenuItem?.Name : item.MenuItemName) × @item.Quantity</span>
                                     <span>$@item.Subtotal</span>
                                 </div>
                             }

@@ -67,6 +67,24 @@ namespace Yustore.Data
                 .HasForeignKey(o => o.RestaurantId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // ── OrderItem ────────────────────────────────────
+            // V-02 修復：這裡原本沒有設定，吃到 EF 預設的 Cascade。
+            // 老闆刪除餐點時會連鎖刪除所有曾經點過這道菜的 OrderItem，
+            // 導致歷史訂單明細消失、訂單金額對不起來。改成 Restrict：
+            // 有歷史訂單引用的 MenuItem 無法被硬刪除（OwnerController 改用軟刪除，見 MenuItem.IsDeleted）。
+            builder.Entity<OrderItem>()
+                .HasOne(oi => oi.MenuItem)
+                .WithMany(m => m.OrderItems)
+                .HasForeignKey(oi => oi.MenuItemId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // ── MenuItem 軟刪除 ─────────────────────────────
+            // 全域查詢篩選器：一般查詢（包含 Include 帶出的導覽屬性）都自動排除已刪除的餐點。
+            // 注意：因此顯示歷史訂單明細時不能依賴 OrderItem.MenuItem 導覽屬性
+            //（餐點被軟刪除後這個導覽屬性會是 null），要改讀 OrderItem.MenuItemName 快照。
+            builder.Entity<MenuItem>()
+                .HasQueryFilter(m => !m.IsDeleted);
+
             // ── Delivery ─────────────────────────────────────
             // 這就是剛才出錯的地方！
             // Delivery 同時關聯 Order 和 User，會造成多條刪除路徑

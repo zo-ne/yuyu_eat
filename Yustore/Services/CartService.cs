@@ -8,6 +8,10 @@ namespace Yustore.Services
         // Session 的 Key 名稱，用來存取購物車資料
         private const string CartKey = "ShoppingCart";
 
+        // 單一品項在購物車裡的數量上限，Controller 已經驗證過一次，
+        // 這裡再做一次是縱深防禦（V-03 修復）：就算未來有其他呼叫路徑忘記驗證，這裡還是會擋住。
+        private const int MaxQuantityPerItem = 99;
+
         // 取得購物車（從 Session 讀出來）
         public CartViewModel GetCart(HttpContext httpContext)
         {
@@ -42,11 +46,14 @@ namespace Yustore.Services
             cart.RestaurantId = restaurantId;
             cart.RestaurantName = restaurantName;
 
+            // 縱深防禦：不管呼叫端有沒有驗證過，這裡一律 clamp 到 1~MaxQuantityPerItem
+            item.Quantity = Math.Clamp(item.Quantity, 1, MaxQuantityPerItem);
+
             // 找看看購物車裡有沒有這道菜
             var existing = cart.Items.FirstOrDefault(i => i.MenuItemId == item.MenuItemId);
 
             if (existing != null)
-                existing.Quantity += item.Quantity; // 已有就增加數量
+                existing.Quantity = Math.Clamp(existing.Quantity + item.Quantity, 1, MaxQuantityPerItem); // 已有就增加數量，一樣夾住上限
             else
                 cart.Items.Add(item); // 沒有就新增
 
@@ -63,7 +70,7 @@ namespace Yustore.Services
                 if (quantity <= 0)
                     cart.Items.Remove(item); // 數量 0 就移除
                 else
-                    item.Quantity = quantity;
+                    item.Quantity = Math.Clamp(quantity, 1, MaxQuantityPerItem);
             }
 
             SaveCart(httpContext, cart);

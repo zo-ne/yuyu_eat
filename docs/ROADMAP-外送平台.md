@@ -334,6 +334,7 @@ Hub 設計:
 
 ## 相關文件
 
-- [PRD.md](./PRD.md) — 產品需求文件
+- [PRD.md](./PRD.md) — 產品需求文件（反推現況）
+- [PRD-v2.md](./PRD-v2.md) — 目標產品需求文件（含時間表與驗收標準）
 - [SDD.md](./SDD.md) — 系統設計文件
 - [ASSESSMENT.md](./ASSESSMENT.md) — 漏洞、業界落差與改善方案

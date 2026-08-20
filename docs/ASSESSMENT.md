@@ -763,6 +763,7 @@ public enum UserRole   { 顧客 = 0, 外送師 = 1, 老闆 = 2 }
 
 ## 相關文件
 
-- [PRD.md](./PRD.md) — 產品需求文件
+- [PRD.md](./PRD.md) — 產品需求文件（反推現況）
+- [PRD-v2.md](./PRD-v2.md) — 目標產品需求文件（含時間表與驗收標準）
 - [SDD.md](./SDD.md) — 系統設計文件
 - [ROADMAP-外送平台.md](./ROADMAP-外送平台.md) — 平台化路線圖

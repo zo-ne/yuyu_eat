@@ -24,7 +24,7 @@
                     @foreach (var item in Model.OrderItems)
                     {
                         <div class="d-flex justify-content-between mb-2">
-                            <span>@item.MenuItem?.Name × @item.Quantity</span>
+                            <span>@(string.IsNullOrEmpty(item.MenuItemName) ? item.MenuItem?.Name : item.MenuItemName) × @item.Quantity</span>
                             <span>$@item.Subtotal</span>
                         </div>
                     }

@@ -253,13 +253,14 @@ namespace Yustore.Controllers
             if (menuItem == null)
                 return NotFound();
 
-            // 刪圖片檔案
-            _imageService.DeleteImage(menuItem.ImageUrl);
-
-            _db.MenuItems.Remove(menuItem);
+            // V-02 修復：改用軟刪除，不再實體刪除資料列或圖片檔案。
+            // 曾經被點過的餐點如果真的從資料庫刪掉，SQL Server 會連鎖刪光所有引用它的 OrderItem，
+            // 歷史訂單金額就對不起來了；圖片檔案也一樣，實體刪除後無法復原。
+            menuItem.IsDeleted = true;
+            menuItem.IsAvailable = false;
             await _db.SaveChangesAsync();
 
-            TempData["Message"] = $"「{menuItem.Name}」已刪除。";
+            TempData["Message"] = $"「{menuItem.Name}」已下架。";
             return RedirectToAction("Menu");
         }
 
