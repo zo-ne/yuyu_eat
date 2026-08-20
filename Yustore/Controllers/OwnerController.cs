@@ -18,22 +18,22 @@ namespace Yustore.Controllers
     {
         private readonly AppDbContext _db;
         private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IImageService _imageService;
         private readonly IEmailQueue _emailQueue;
         private readonly IOrderService _orderService;
+        private readonly IRestaurantService _restaurantService;
 
         public OwnerController(
             AppDbContext db,
             UserManager<ApplicationUser> userManager,
-            IImageService imageService,
             IEmailQueue emailQueue,
-            IOrderService orderService)
+            IOrderService orderService,
+            IRestaurantService restaurantService)
         {
             _db = db;
             _userManager = userManager;
-            _imageService = imageService;
             _emailQueue = emailQueue;
             _orderService = orderService;
+            _restaurantService = restaurantService;
         }
 
         // ════════════════════════════════════════
@@ -46,8 +46,7 @@ namespace Yustore.Controllers
             var user = await _userManager.GetUserAsync(User);
 
             // 取得這個老闆的店家
-            var restaurant = await _db.Restaurants
-                .FirstOrDefaultAsync(r => r.OwnerId == user!.Id);
+            var restaurant = await _restaurantService.GetByOwnerIdAsync(user!.Id);
 
             // 如果還沒建立店家，跳到建立店家頁面
             if (restaurant == null)
@@ -93,38 +92,17 @@ namespace Yustore.Controllers
         public async Task<IActionResult> SetupRestaurant(Restaurant model, IFormFile? logoFile)
         {
             var user = await _userManager.GetUserAsync(User);
+            var result = await _restaurantService.CreateAsync(
+                user!.Id, model.Name, model.Description, model.Address, model.Phone, logoFile);
 
-            // 已經有店家了就不能再建
-            var existing = await _db.Restaurants
-                .FirstOrDefaultAsync(r => r.OwnerId == user!.Id);
-            if (existing != null)
-                return RedirectToAction("Index");
-
-            var restaurant = new Restaurant
+            switch (result.Result)
             {
-                Name = model.Name,
-                Description = model.Description,
-                Address = model.Address,
-                Phone = model.Phone,
-                OwnerId = user!.Id
-            };
-
-            // 如果有上傳 Logo
-            if (logoFile != null && logoFile.Length > 0)
-            {
-                try
-                {
-                    restaurant.LogoUrl = await _imageService.SaveImageAsync(logoFile, "restaurants");
-                }
-                catch (ArgumentException ex)
-                {
-                    ModelState.AddModelError(string.Empty, ex.Message);
+                case RestaurantOpResult.AlreadyExists:
+                    return RedirectToAction("Index"); // 已經有店家了就不能再建，跟原本行為一致：不顯示錯誤，直接導回後台
+                case RestaurantOpResult.ValidationFailed:
+                    ModelState.AddModelError(string.Empty, result.ErrorMessage!);
                     return View(model);
-                }
             }
-
-            _db.Restaurants.Add(restaurant);
-            await _db.SaveChangesAsync();
 
             TempData["Message"] = "店家建立成功！";
             return RedirectToAction("Index");
@@ -138,14 +116,13 @@ namespace Yustore.Controllers
         public async Task<IActionResult> Menu()
         {
             var user = await _userManager.GetUserAsync(User);
-            var restaurant = await _db.Restaurants
-                .Include(r => r.MenuItems) // 一起把菜單載入
-                .FirstOrDefaultAsync(r => r.OwnerId == user!.Id);
+            var restaurant = await _restaurantService.GetByOwnerIdAsync(user!.Id);
 
             if (restaurant == null)
                 return RedirectToAction("SetupRestaurant");
 
-            return View(restaurant.MenuItems.ToList());
+            var menuItems = await _restaurantService.GetMenuAsync(user.Id);
+            return View(menuItems);
         }
 
         // GET: /Owner/CreateMenuItem
@@ -165,39 +142,18 @@ namespace Yustore.Controllers
                 return View(model);
 
             var user = await _userManager.GetUserAsync(User);
-            var restaurant = await _db.Restaurants
-                .FirstOrDefaultAsync(r => r.OwnerId == user!.Id);
+            var result = await _restaurantService.CreateMenuItemAsync(user!.Id, model);
 
-            if (restaurant == null)
-                return RedirectToAction("SetupRestaurant");
-
-            var menuItem = new MenuItem
+            switch (result.Result)
             {
-                Name = model.Name,
-                Description = model.Description,
-                Price = model.Price,
-                IsAvailable = model.IsAvailable,
-                RestaurantId = restaurant.Id
-            };
-
-            // 處理圖片上傳
-            if (model.ImageFile != null && model.ImageFile.Length > 0)
-            {
-                try
-                {
-                    menuItem.ImageUrl = await _imageService.SaveImageAsync(model.ImageFile, "menu");
-                }
-                catch (ArgumentException ex)
-                {
-                    ModelState.AddModelError(string.Empty, ex.Message);
+                case RestaurantOpResult.NotFound:
+                    return RedirectToAction("SetupRestaurant");
+                case RestaurantOpResult.ValidationFailed:
+                    ModelState.AddModelError(string.Empty, result.ErrorMessage!);
                     return View(model);
-                }
             }
 
-            _db.MenuItems.Add(menuItem);
-            await _db.SaveChangesAsync();
-
-            TempData["Message"] = $"「{menuItem.Name}」新增成功！";
+            TempData["Message"] = $"「{result.MenuItem!.Name}」新增成功！";
             return RedirectToAction("Menu");
         }
 
@@ -206,12 +162,9 @@ namespace Yustore.Controllers
         public async Task<IActionResult> EditMenuItem(int id)
         {
             var user = await _userManager.GetUserAsync(User);
-            var restaurant = await _db.Restaurants
-                .FirstOrDefaultAsync(r => r.OwnerId == user!.Id);
 
             // 確認這個餐點屬於這個老闆的店
-            var menuItem = await _db.MenuItems
-                .FirstOrDefaultAsync(m => m.Id == id && m.RestaurantId == restaurant!.Id);
+            var menuItem = await _restaurantService.GetMenuItemAsync(user!.Id, id);
 
             if (menuItem == null)
                 return NotFound();
@@ -239,41 +192,18 @@ namespace Yustore.Controllers
                 return View(model);
 
             var user = await _userManager.GetUserAsync(User);
-            var restaurant = await _db.Restaurants
-                .FirstOrDefaultAsync(r => r.OwnerId == user!.Id);
+            var result = await _restaurantService.UpdateMenuItemAsync(user!.Id, model);
 
-            var menuItem = await _db.MenuItems
-                .FirstOrDefaultAsync(m => m.Id == model.Id && m.RestaurantId == restaurant!.Id);
-
-            if (menuItem == null)
-                return NotFound();
-
-            menuItem.Name = model.Name;
-            menuItem.Description = model.Description;
-            menuItem.Price = model.Price;
-            menuItem.IsAvailable = model.IsAvailable;
-
-            // 如果有上傳新圖片：先驗證新圖片存得起來，成功了才刪舊圖片，避免驗證失敗時新舊圖片一起消失
-            if (model.ImageFile != null && model.ImageFile.Length > 0)
+            switch (result.Result)
             {
-                string newImageUrl;
-                try
-                {
-                    newImageUrl = await _imageService.SaveImageAsync(model.ImageFile, "menu");
-                }
-                catch (ArgumentException ex)
-                {
-                    ModelState.AddModelError(string.Empty, ex.Message);
+                case RestaurantOpResult.NotFound:
+                    return NotFound();
+                case RestaurantOpResult.ValidationFailed:
+                    ModelState.AddModelError(string.Empty, result.ErrorMessage!);
                     return View(model);
-                }
-
-                _imageService.DeleteImage(menuItem.ImageUrl);
-                menuItem.ImageUrl = newImageUrl;
             }
 
-            await _db.SaveChangesAsync();
-
-            TempData["Message"] = $"「{menuItem.Name}」更新成功！";
+            TempData["Message"] = $"「{result.MenuItem!.Name}」更新成功！";
             return RedirectToAction("Menu");
         }
 
@@ -283,23 +213,14 @@ namespace Yustore.Controllers
         public async Task<IActionResult> DeleteMenuItem(int id)
         {
             var user = await _userManager.GetUserAsync(User);
-            var restaurant = await _db.Restaurants
-                .FirstOrDefaultAsync(r => r.OwnerId == user!.Id);
 
-            var menuItem = await _db.MenuItems
-                .FirstOrDefaultAsync(m => m.Id == id && m.RestaurantId == restaurant!.Id);
+            // V-02 修復：改用軟刪除，不再實體刪除資料列或圖片檔案（見 IRestaurantService.DeleteMenuItemAsync）。
+            var result = await _restaurantService.DeleteMenuItemAsync(user!.Id, id);
 
-            if (menuItem == null)
+            if (!result.Success)
                 return NotFound();
 
-            // V-02 修復：改用軟刪除，不再實體刪除資料列或圖片檔案。
-            // 曾經被點過的餐點如果真的從資料庫刪掉，SQL Server 會連鎖刪光所有引用它的 OrderItem，
-            // 歷史訂單金額就對不起來了；圖片檔案也一樣，實體刪除後無法復原。
-            menuItem.IsDeleted = true;
-            menuItem.IsAvailable = false;
-            await _db.SaveChangesAsync();
-
-            TempData["Message"] = $"「{menuItem.Name}」已下架。";
+            TempData["Message"] = $"「{result.MenuItem!.Name}」已下架。";
             return RedirectToAction("Menu");
         }
 
@@ -311,8 +232,7 @@ namespace Yustore.Controllers
         public async Task<IActionResult> Orders(int page = 1)
         {
             var user = await _userManager.GetUserAsync(User);
-            var restaurant = await _db.Restaurants
-                .FirstOrDefaultAsync(r => r.OwnerId == user!.Id);
+            var restaurant = await _restaurantService.GetByOwnerIdAsync(user!.Id);
 
             if (restaurant == null)
                 return RedirectToAction("SetupRestaurant");

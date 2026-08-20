@@ -150,11 +150,11 @@ erDiagram
 
 ## 已知限制
 
-目前處於 [`docs/PRD-v2.md`](docs/PRD-v2.md) 規劃的 **M0（止血）+ M1（安全與正確性）+ M2（工程實務）+ M3（架構重構，部分完成）** 之後的狀態：[`docs/ASSESSMENT.md`](docs/ASSESSMENT.md) 列出的全部 17 項安全/正確性漏洞（V-01 ~ V-17）都已修復，enum 全面改英文命名，補上單元測試（54 個）、CI、Docker、Serilog、`.editorconfig`；訂單網域的核心邏輯已抽成 `IOrderService`，角色改用 Claims（`_Layout` 不再查 DB），寄信改背景佇列，四個原本零分頁的列表頁加上分頁。下列項目仍在後續里程碑中：
+目前處於 [`docs/PRD-v2.md`](docs/PRD-v2.md) 規劃的 **M0（止血）+ M1（安全與正確性）+ M2（工程實務）+ M3（架構重構，大部分完成）** 之後的狀態：[`docs/ASSESSMENT.md`](docs/ASSESSMENT.md) 列出的全部 17 項安全/正確性漏洞（V-01 ~ V-17）都已修復，enum 全面改英文命名，補上單元測試（71 個）、CI、Docker、Serilog、`.editorconfig`；四個業務網域（訂單/店家/結算/評價）都已抽成 Service 層（`IOrderService`/`IRestaurantService`/`ISettlementService`/`IReviewService`），Controller 只剩接資料、呼叫 Service、回應；角色改用 Claims（`_Layout` 不再查 DB），寄信改背景佇列，四個原本零分頁的列表頁加上分頁。下列項目仍在後續里程碑中：
 
 - 金流為模擬付款，尚未串接真實金流（M5）
 - 尚無 Admin 治理後台，老闆／外送師帳號審核目前只能手動改 `IsActive`（M4）
-- `Restaurant` / `Settlement` / `Review` 還沒有獨立 Service 層，邏輯還在 Controller 裡；DTO 投影（`.Select()` 取代 `.Include()`）只套用在這次加分頁的四個查詢，沒有全站通盤重構（M3 後續）
+- DTO 投影（`.Select()` 取代 `.Include()`）只套用在有加分頁的查詢，沒有全站通盤重構（M3 後續）
 - 只有單元測試，沒有整合測試；沒有設覆蓋率門檻
 - Session 用記憶體、上傳檔案存本機磁碟，尚未支援水平擴展
 

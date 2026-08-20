@@ -90,6 +90,9 @@ try
 
     // M3 修復（§3.1 Service 層拆分）
     builder.Services.AddScoped<IOrderService, OrderService>();
+    builder.Services.AddScoped<IRestaurantService, RestaurantService>();
+    builder.Services.AddScoped<ISettlementService, SettlementService>();
+    builder.Services.AddScoped<IReviewService, ReviewService>();
 
     // V-07 修復：Login / Register 加速率限制，防止帳號被拿去大量嘗試密碼或大量灌註冊寄信。
     // 用 IP 當 partition key，同一個 IP 每分鐘最多 5 次請求，超過的直接排隊 0（立刻拒絕）。

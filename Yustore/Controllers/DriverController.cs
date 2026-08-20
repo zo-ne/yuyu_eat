@@ -16,15 +16,18 @@ namespace Yustore.Controllers
         private readonly AppDbContext _db;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IImageService _imageService;
+        private readonly ISettlementService _settlementService;
 
         public DriverController(
             AppDbContext db,
             UserManager<ApplicationUser> userManager,
-            IImageService imageService)
+            IImageService imageService,
+            ISettlementService settlementService)
         {
             _db = db;
             _userManager = userManager;
             _imageService = imageService;
+            _settlementService = settlementService;
         }
 
         // ════════════════════════════════════════
@@ -220,24 +223,14 @@ namespace Yustore.Controllers
             // 更新訂單狀態為「已送達」
             delivery.Order.Status = OrderStatus.Delivered;
 
-            // 建立結算記錄
+            // 建立結算記錄（M3 修復 §3.1：搬進 ISettlementService）。
+            // 這裡刻意不先呼叫 SaveChangesAsync：DriverController 跟 SettlementService
+            // 共用同一個（Scoped）DbContext，delivery/order 的變更已經在追蹤中，
+            // CreateForDeliveryAsync 內部的 SaveChangesAsync 會把兩邊的異動一起存檔，
+            // 維持「送達狀態」跟「結算記錄」這兩件事原子性地同時成功或同時失敗。
             // 外送師收了顧客的現金，餐費部分要月底結算給老闆
-            var restaurant = await _db.Restaurants
-                .FirstOrDefaultAsync(r => r.Id == delivery.Order.RestaurantId);
-
-            var settlement = new Settlement
-            {
-                OrderId = delivery.Order.Id,
-                DriverId = user!.Id,
-                OwnerId = restaurant!.OwnerId,
-                FoodAmount = delivery.Order.FoodTotal, // 餐費（不含外送費）
-                Status = SettlementStatus.Unsettled,
-                Year = DateTime.Now.Year,
-                Month = DateTime.Now.Month
-            };
-
-            _db.Settlements.Add(settlement);
-            await _db.SaveChangesAsync();
+            await _settlementService.CreateForDeliveryAsync(
+                delivery.Order.Id, delivery.Order.RestaurantId, delivery.Order.FoodTotal, user!.Id);
 
             TempData["Message"] = "✅ 訂單完成！結算記錄已建立。";
             return RedirectToAction("MyOrders");

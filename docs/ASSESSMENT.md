@@ -395,7 +395,7 @@ wwwroot/uploads/menu/…{png,HEIC}
 >
 > M2（`m2-engineering-practices` 分支）另外補上：Docker/docker-compose、xUnit 單元測試（43 個，覆蓋 §6 建議的購物車/狀態機/評價授權邏輯）、GitHub Actions CI、Serilog 結構化日誌、`.editorconfig` + `Directory.Build.props`（`TreatWarningsAsErrors`）。§3.2 表格裡「自動化測試」「CI/CD」兩項落差已補上。
 >
-> M3（`m3-architecture-refactor` 分支，部分完成）補上：P-01/P-02/P-05/P-07、Options Pattern（`EmailSettings`）、角色改用 Claims（`_Layout`/`RoleRequiredAttribute` 零多餘 DB 查詢）、全站分頁（4 個列表頁）、`IOrderService`（訂單網域的 Service 層拆分，含 11 個單元測試，累計 54 個）。§3.2 表格裡「分層架構」落差**部分**補上——訂單網域抽出來了，`Restaurant`/`Settlement`/`Review` 還沒有獨立 Service，詳見 [PRD-v2.md §8「M3 完成範圍說明」](./PRD-v2.md#m3-完成範圍說明)。
+> M3 補上：P-01/P-02/P-05/P-07、Options Pattern（`EmailSettings`）、角色改用 Claims（`_Layout`/`RoleRequiredAttribute` 零多餘 DB 查詢）、全站分頁（4 個列表頁）、**Service 層四拆全完成**——`IOrderService`/`IRestaurantService`/`ISettlementService`/`IReviewService`，四個 Controller（Customer/Owner/Driver/Review）業務邏輯全部搬進 Service 層，累計 71 個單元測試，並用 Docker 實際跑過端到端驗證。§3.2 表格裡「分層架構」落差已補上；DTO 投影沒做全站通盤重構，詳見 [PRD-v2.md §8「M3 完成範圍說明」](./PRD-v2.md#m3-完成範圍說明)。
 
 **做對的地方**(這些要在面試時講出來):
 - ✅ 全域 `AuthorizeFilter` fail-closed 預設拒絕 — 比大多數學習專案好

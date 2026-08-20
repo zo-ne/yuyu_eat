@@ -18,17 +18,20 @@ namespace Yustore.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ICartService _cartService;
         private readonly IOrderService _orderService;
+        private readonly IRestaurantService _restaurantService;
 
         public CustomerController(
             AppDbContext db,
             UserManager<ApplicationUser> userManager,
             ICartService cartService,
-            IOrderService orderService)
+            IOrderService orderService,
+            IRestaurantService restaurantService)
         {
             _db = db;
             _userManager = userManager;
             _cartService = cartService;
             _orderService = orderService;
+            _restaurantService = restaurantService;
         }
 
         // ════════════════════════════════════════
@@ -37,27 +40,7 @@ namespace Yustore.Controllers
 
         public async Task<IActionResult> Index(string? search, int page = 1)
         {
-            // IQueryable = 還沒真正執行查詢，可以繼續加條件
-            var query = _db.Restaurants
-                .Where(r => r.IsOpen)
-                .AsQueryable();
-
-            // 如果有搜尋關鍵字
-            if (!string.IsNullOrEmpty(search))
-            {
-                query = query.Where(r =>
-                    r.Name.Contains(search) ||
-                    r.Description!.Contains(search));
-            }
-
-            // M3 修復（§3.2 全站零分頁 / §3.3 唯讀查詢加 AsNoTracking）：
-            // 店家一多，一次把全部撈出來的成本會愈來愈高；這個查詢單純顯示用，不會被存回去，
-            // AsNoTracking() 讓 EF Core 不用花力氣追蹤變更。
-            var restaurants = await query
-                .Include(r => r.Owner)
-                .OrderBy(r => r.Id) // 分頁一定要有明確排序，不然每頁的順序不保證穩定
-                .AsNoTracking()
-                .ToPagedResultAsync(page);
+            var restaurants = await _restaurantService.SearchOpenRestaurantsAsync(search, page);
 
             ViewBag.Search = search;
             return View(restaurants);
@@ -69,29 +52,18 @@ namespace Yustore.Controllers
 
         public async Task<IActionResult> Restaurant(int id)
         {
-            var restaurant = await _db.Restaurants
-                .Include(r => r.MenuItems.Where(m => m.IsAvailable)) // 只載入供應中的餐點
-                .Include(r => r.Owner)
-                .FirstOrDefaultAsync(r => r.Id == id && r.IsOpen);
-
-            if (restaurant == null)
+            var detail = await _restaurantService.GetDetailAsync(id);
+            if (detail == null)
                 return NotFound();
 
-            // P-02 修復：原本把這家店收到的「全部」評價都撈進記憶體才算平均，
-            // 一萬則評價就是一萬個物件。改成讓 SQL Server 直接算 COUNT/AVG，
-            // 不管評價有多少筆，這裡都只有一趟查詢、幾乎零記憶體開銷。
-            var reviewsForOwner = _db.Reviews.Where(r => r.TargetUserId == restaurant.OwnerId);
-
-            ViewBag.ReviewCount = await reviewsForOwner.CountAsync();
-            ViewBag.AverageRating = ViewBag.ReviewCount > 0
-                ? Math.Round(await reviewsForOwner.AverageAsync(r => r.Stars), 1)
-                : 0;
+            ViewBag.ReviewCount = detail.ReviewCount;
+            ViewBag.AverageRating = detail.AverageRating;
 
             // 取得目前購物車（顯示已選數量用）
             var cart = _cartService.GetCart(HttpContext);
             ViewBag.Cart = cart;
 
-            return View(restaurant);
+            return View(detail.Restaurant);
         }
 
         // ════════════════════════════════════════
