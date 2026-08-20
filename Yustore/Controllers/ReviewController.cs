@@ -1,10 +1,9 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Yustore.Data;
 using Yustore.Enums;
 using Yustore.Models.Entities;
+using Yustore.Services;
 using Yustore.ViewModels;
 
 namespace Yustore.Controllers
@@ -14,15 +13,15 @@ namespace Yustore.Controllers
     [Authorize]
     public class ReviewController : Controller
     {
-        private readonly AppDbContext _db;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IReviewService _reviewService;
 
         public ReviewController(
-            AppDbContext db,
-            UserManager<ApplicationUser> userManager)
+            UserManager<ApplicationUser> userManager,
+            IReviewService reviewService)
         {
-            _db = db;
             _userManager = userManager;
+            _reviewService = reviewService;
         }
 
         // ════════════════════════════════════════
@@ -30,58 +29,33 @@ namespace Yustore.Controllers
         // ════════════════════════════════════════
 
         // GET: /Review/OrderReviews/5
+        // M3 修復（§3.1 Service 層拆分）：授權判定與訂單查詢搬進 IReviewService，
+        // 這裡只負責把 Service 的結果轉成對應的 HTTP 回應。
         public async Task<IActionResult> OrderReviews(int orderId)
         {
             var user = await _userManager.GetUserAsync(User);
+            var result = await _reviewService.GetOrderReviewsAsync(orderId, user!);
 
-            var order = await _db.Orders
-                .Include(o => o.Restaurant)
-                    .ThenInclude(r => r.Owner)
-                .Include(o => o.Delivery)
-                    .ThenInclude(d => d!.Driver)
-                .Include(o => o.Customer)
-                .Include(o => o.Reviews)
-                .FirstOrDefaultAsync(o => o.Id == orderId);
-
-            if (order == null)
-                return NotFound();
-
-            // 只有訂單相關人員才能評分
-            bool isCustomer = order.CustomerId == user!.Id;
-            bool isDriver = order.Delivery?.DriverId == user.Id;
-            bool isOwner = order.Restaurant.OwnerId == user.Id;
-
-            if (!isCustomer && !isDriver && !isOwner)
-                return Forbid();
-
-            // 只有已送達或完成的訂單才能評分
-            if (order.Status != OrderStatus.Delivered && order.Status != OrderStatus.Completed)
+            switch (result.Result)
             {
-                TempData["Error"] = "訂單尚未完成，無法評分。";
-                return RedirectToAction("Index", GetRedirectController(user.Role));
+                case ReviewOpResult.NotFound:
+                    return NotFound();
+                case ReviewOpResult.Forbidden:
+                    return Forbid();
+                case ReviewOpResult.NotYetCompleted:
+                    TempData["Error"] = "訂單尚未完成，無法評分。";
+                    return RedirectToAction("Index", GetRedirectController(user!.Role));
             }
 
-            var model = new OrderReviewViewModel
-            {
-                OrderId = order.Id,
-                OrderNumber = order.OrderNumber,
-                PendingReviews = GetReviewTargets(order, user).Select(t => new PendingReviewItem
-                {
-                    TargetUserId = t.TargetUserId,
-                    TargetUserName = t.TargetUserName,
-                    TargetType = t.TargetType,
-                    AlreadyReviewed = order.Reviews.Any(r =>
-                        r.ReviewerId == user.Id &&
-                        r.TargetUserId == t.TargetUserId)
-                }).ToList()
-            };
-
-            return View(model);
+            return View(result.Model);
         }
 
         // ════════════════════════════════════════
         // V-01 修復：伺服器端依「訂單 + 目前登入者」推導出合法的評分對象清單，
         // GET / POST Create 都必須拿這份清單驗證，不能相信表單/查詢字串傳來的 TargetUserId / TargetType。
+        // 這兩個純邏輯方法留在這裡（不搬進 IReviewService）是刻意的：ReviewService 跟
+        // ReviewAuthorizationTests（M2）都直接呼叫這兩個 internal static 方法，
+        // 純函式不需要依賴 DbContext，測試起來也不用 mock 任何東西。
         // ════════════════════════════════════════
         internal static List<(string TargetUserId, string TargetUserName, ReviewTargetType TargetType)> GetReviewTargets(
             Order order, ApplicationUser user)
@@ -140,43 +114,6 @@ namespace Yustore.Controllers
             return pairs;
         }
 
-        // 載入 Create 需要的訂單資料，並統一做「使用者是否為訂單相關人員」「訂單狀態是否可評分」
-        // 「targetUserId 是否為合法評分對象」三項檢查。任何一項不通過就回傳對應的 IActionResult。
-        private async Task<(Order? Order, ApplicationUser? User, ReviewTargetType TargetType, IActionResult? Error)>
-            ValidateReviewRequestAsync(int orderId, string targetUserId)
-        {
-            var user = await _userManager.GetUserAsync(User);
-
-            var order = await _db.Orders
-                .Include(o => o.Restaurant)
-                    .ThenInclude(r => r.Owner)
-                .Include(o => o.Delivery)
-                    .ThenInclude(d => d!.Driver)
-                .Include(o => o.Customer)
-                .Include(o => o.Reviews) // R-4 修復要用到：判斷這筆訂單所有應評對象是否都評完了
-                .FirstOrDefaultAsync(o => o.Id == orderId);
-
-            if (order == null || user == null)
-                return (null, null, default, NotFound());
-
-            // 訂單狀態必須是已送達或完成才能評分（連「待付款」都能評分是 V-01 的一部分）
-            if (order.Status != OrderStatus.Delivered && order.Status != OrderStatus.Completed)
-            {
-                TempData["Error"] = "訂單尚未完成，無法評分。";
-                return (null, null, default, RedirectToAction("Index", GetRedirectController(user.Role)));
-            }
-
-            // targetUserId 必須是「這筆訂單、這個登入者」合法能評分的對象之一，
-            // TargetType 一律由伺服器依這份清單推導，不採用表單/查詢字串傳入的值
-            var target = GetReviewTargets(order, user)
-                .FirstOrDefault(t => t.TargetUserId == targetUserId);
-
-            if (target.TargetUserId == null)
-                return (null, null, default, Forbid());
-
-            return (order, user, target.TargetType, null);
-        }
-
         // ════════════════════════════════════════
         // 評分頁面
         // ════════════════════════════════════════
@@ -186,36 +123,24 @@ namespace Yustore.Controllers
         [HttpGet]
         public async Task<IActionResult> Create(int orderId, string targetUserId)
         {
-            var (order, user, targetType, error) = await ValidateReviewRequestAsync(orderId, targetUserId);
-            if (error != null)
-                return error;
+            var user = await _userManager.GetUserAsync(User);
+            var result = await _reviewService.PrepareReviewAsync(orderId, targetUserId, user!);
 
-            // 檢查是否已經評過
-            var alreadyReviewed = await _db.Reviews.AnyAsync(r =>
-                r.OrderId == orderId &&
-                r.ReviewerId == user!.Id &&
-                r.TargetUserId == targetUserId);
-
-            if (alreadyReviewed)
+            switch (result.Result)
             {
-                TempData["Error"] = "你已經評過這位使用者了！";
-                return RedirectToAction("OrderReviews", new { orderId });
+                case ReviewOpResult.NotFound:
+                    return NotFound();
+                case ReviewOpResult.Forbidden:
+                    return Forbid();
+                case ReviewOpResult.NotYetCompleted:
+                    TempData["Error"] = "訂單尚未完成，無法評分。";
+                    return RedirectToAction("Index", GetRedirectController(user!.Role));
+                case ReviewOpResult.AlreadyReviewed:
+                    TempData["Error"] = "你已經評過這位使用者了！";
+                    return RedirectToAction("OrderReviews", new { orderId });
             }
 
-            var targetUser = await _userManager.FindByIdAsync(targetUserId);
-            if (targetUser == null)
-                return NotFound();
-
-            var model = new ReviewViewModel
-            {
-                OrderId = orderId,
-                OrderNumber = order!.OrderNumber,
-                TargetUserId = targetUserId,
-                TargetUserName = targetUser.FullName,
-                TargetType = targetType
-            };
-
-            return View(model);
+            return View(result.Model);
         }
 
         // POST: /Review/Create
@@ -226,56 +151,28 @@ namespace Yustore.Controllers
             if (!ModelState.IsValid)
                 return View(model);
 
-            // model.TargetType 來自表單，不可信任；重新驗證關聯人身分並由伺服器推導正確的 TargetType（V-01 修復）
-            var (order, user, targetType, error) = await ValidateReviewRequestAsync(model.OrderId, model.TargetUserId);
-            if (error != null)
-                return error;
+            var user = await _userManager.GetUserAsync(User);
 
-            // 再次確認沒有重複評分
-            var alreadyReviewed = await _db.Reviews.AnyAsync(r =>
-                r.OrderId == model.OrderId &&
-                r.ReviewerId == user!.Id &&
-                r.TargetUserId == model.TargetUserId);
+            // model.TargetType 來自表單，不可信任；IReviewService 內部會重新驗證關聯人身分
+            // 並由伺服器推導正確的 TargetType（V-01 修復）
+            var result = await _reviewService.SubmitReviewAsync(
+                model.OrderId, model.TargetUserId, user!, model.Stars, model.Comment);
 
-            if (alreadyReviewed)
+            switch (result)
             {
-                TempData["Error"] = "你已經評過這位使用者了！";
-                return RedirectToAction("OrderReviews", new { orderId = model.OrderId });
+                case ReviewOpResult.NotFound:
+                    return NotFound();
+                case ReviewOpResult.Forbidden:
+                    return Forbid();
+                case ReviewOpResult.NotYetCompleted:
+                    TempData["Error"] = "訂單尚未完成，無法評分。";
+                    return RedirectToAction("Index", GetRedirectController(user!.Role));
+                case ReviewOpResult.AlreadyReviewed:
+                    TempData["Error"] = "你已經評過這位使用者了！";
+                    return RedirectToAction("OrderReviews", new { orderId = model.OrderId });
             }
 
-            var review = new Review
-            {
-                OrderId = model.OrderId,
-                ReviewerId = user!.Id,
-                TargetUserId = model.TargetUserId,
-                TargetType = targetType,
-                Stars = model.Stars,
-                Comment = model.Comment
-            };
-
-            _db.Reviews.Add(review);
-
-            // R-4 修復：原本只要「任一人」評分就把訂單轉「完成」，
-            // 改成「這筆訂單所有應評對象都評完」才轉換。
-            // （order 是 ValidateReviewRequestAsync 已經查過、且被同一個 _db 追蹤的實體，不用重查）
-            if (order!.Status == OrderStatus.Delivered)
-            {
-                var requiredPairs = GetAllRequiredReviewPairs(order);
-                var donePairs = order.Reviews
-                    .Select(r => (r.ReviewerId, r.TargetUserId))
-                    .Append((review.ReviewerId, review.TargetUserId)) // 這筆剛加進 _db 但還沒存檔的評分也要算進去
-                    .ToHashSet();
-
-                if (requiredPairs.All(p => donePairs.Contains(p)))
-                {
-                    order.Status = OrderStatus.Completed;
-                    order.CompletedAt = DateTime.Now;
-                }
-            }
-
-            await _db.SaveChangesAsync();
-
-            TempData["Message"] = $"已成功評分！";
+            TempData["Message"] = "已成功評分！";
             return RedirectToAction("OrderReviews", new { orderId = model.OrderId });
         }
 

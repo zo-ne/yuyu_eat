@@ -201,7 +201,7 @@
 | **M0：止血** | .gitignore 修正、移除已 commit 的上傳檔案、修 V-01/V-02/V-03/V-12、補 `Error` action、刪除 `AYuCantina`、寫 README | ASSESSMENT §6 階段 0 | 3~5 天 | ✅ 完成（`m0-security-hotfix`） |
 | **M1：安全與正確性** | V-04~V-11/V-13~V-15 全部修復；enum 改英文；圖片上傳改用 ImageSharp | ASSESSMENT §6 階段 1 | 1 週 | ✅ 完成（`m1-security-hardening`） |
 | **M2：工程實務** | Docker、xUnit 單元測試、GitHub Actions CI、Serilog、`.editorconfig` | ASSESSMENT §6 階段 2 | 1~1.5 週 | ✅ 完成（`m2-engineering-practices`） |
-| **M3：架構重構** | Service 層拆分、DTO 投影、Options Pattern、分頁、角色改用 Claims | ASSESSMENT §6 階段 3 | 1.5~2 週 | 🟡 部分完成（`m3-architecture-refactor`，見下方說明） |
+| **M3：架構重構** | Service 層拆分、DTO 投影、Options Pattern、分頁、角色改用 Claims | ASSESSMENT §6 階段 3 | 1.5~2 週 | 🟡 大部分完成（`m3-architecture-refactor` + `m3b-restaurant-settlement-review-services`，DTO 投影未做全站通盤重構，見下方說明） |
 | **M4：治理與商業模式** | Admin 後台（審核/停權/訂單總覽）、申請制上線、`Settlement` 拆分為分潤+月結批次 | 本文件 §5.6, §7 | 1.5~2 週 |
 | **M5：真實金流 + 即時推播** | ECPay/NewebPay Sandbox 串接、SignalR `OrderHub`、未登入首頁與店家卡片視覺改造 | 本文件 §5.8, §5.9；ROADMAP §1, §3.3 | 2 週 |
 | **M6：雲端部署** | Dockerfile 上雲、環境變數/Key Vault 設定、Demo 帳號準備、README 補上架構圖與網址 | 本文件 §6.3 | 3~5 天 |
@@ -211,18 +211,21 @@
 
 ### M3 完成範圍說明
 
-M3 範圍很大，這次先把最高價值、最有代表性的部分做完整，其餘留給下一輪：
-
 **已完成**：
+- **Service 層拆分（§3.1/§3.2）四個都做完了**：
+  - `IOrderService`：結帳重新驗價、付款、狀態轉換白名單（`OrderServiceTests` 11 個情境）
+  - `IRestaurantService`：店家搜尋/詳情、店家建立、菜單 CRUD（軟刪除）（`RestaurantServiceTests` 8 個情境）
+  - `ISettlementService`：外送完成時建立結算記錄（`SettlementServiceTests` 2 個情境）——目前只有「寫入」，完整的分潤/月結批次查詢介面留給 M4（見 §4 商業模式）
+  - `IReviewService`：評價授權判定、建立評價、R-4 完成條件（`ReviewServiceTests` 7 個情境，搭配 M2 就有的 `ReviewAuthorizationTests` 涵蓋純邏輯部分）
+  - 四個 Controller（Customer/Owner/Driver/Review）現在都只負責接資料、呼叫 Service、把結果轉成 HTTP 回應，業務邏輯全部在 Service 層，且都有單元測試涵蓋
 - P-01（老闆後台統計數字只算最近 10 筆）、P-02（評分平均值撈整張表進記憶體，改用 `AverageAsync`/`CountAsync`）、P-05（寄信擋住 HTTP 請求，改成 `IEmailQueue` + `EmailBackgroundService` 背景佇列）、P-07（角色 Filter 重複三份，M1 已合併，這次補上 Claims 化）
 - Options Pattern：`EmailSettings` 改用 `IOptions<EmailSettings>`，不再到處 `_config["EmailSettings:..."]`
 - 角色改用 Claims：`AppClaimsPrincipalFactory` 在登入時把 Role/FullName/Email 放進 Claims，`_Layout.cshtml` 不再查 DB，`RoleRequiredAttribute` 角色檢查零 DB（IsActive 停權檢查因為要即時生效，仍然查 DB）
 - 分頁：新增 `PagedResult<T>` + `ToPagedResultAsync()` + 共用 `_Pagination.cshtml`，套用到 `Customer/Index`、`Owner/Orders`、`Driver/AvailableOrders`、`Driver/MyOrders` 四個原本零分頁的列表頁，順便把這幾個查詢加上 `AsNoTracking()`
-- Service 層拆分（部分）：訂單網域的核心邏輯（結帳重新驗價、付款、狀態轉換白名單）抽成 `IOrderService`，`CustomerController`/`OwnerController` 只剩接資料、呼叫 Service、回應。`OrderServiceTests` 覆蓋 11 個情境
+- 全套改動都用 Docker 實際跑過一次端到端驗證（build → up → migration → HTTP 200 → 各角色路由回傳正確的 302/非 500），不只是單元測試綠燈
 
 **尚未完成，留給下一輪**：
-- `IRestaurantService` / `ISettlementService` / `IReviewService` 還沒抽出來——`RestaurantController` 的邏輯目前還是內建在 `CustomerController`/`OwnerController` 裡；`ReviewController` 的核心判定邏輯已經是獨立、可測試的 `internal static` 方法（見 M2 的 `ReviewAuthorizationTests`），但還沒搬進真正的 Service 類別
-- DTO 投影（`.Select()` 取代 `.Include()` 整包實體）只套用在這次順手加分頁的四個查詢，沒有對全專案做一次通盤的投影重構
+- DTO 投影（`.Select()` 取代 `.Include()` 整包實體）只套用在有加分頁的幾個查詢，沒有對全專案做一次通盤的投影重構
 - `Restaurant.RatingSum`/`RatingCount` 快取欄位沒有做——用 `AverageAsync` 直接讓 SQL Server 算，在這個專案的資料量下已經足夠正確又夠快，快取欄位的維護成本（每次評分寫入都要同步更新）目前換不到明顯效益，先不做
 
 ---
