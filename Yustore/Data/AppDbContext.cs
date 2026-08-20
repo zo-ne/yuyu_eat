@@ -13,7 +13,8 @@ namespace Yustore.Data
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<Delivery> Deliveries { get; set; }
-        public DbSet<Settlement> Settlements { get; set; }
+        public DbSet<OrderTransaction> OrderTransactions { get; set; }
+        public DbSet<SettlementBatch> SettlementBatches { get; set; }
         public DbSet<Review> Reviews { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
@@ -40,25 +41,48 @@ namespace Yustore.Data
                 .HasForeignKey(r => r.TargetUserId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // ── Settlement ──────────────────────────────────
-            builder.Entity<Settlement>()
-                .HasOne(s => s.Driver)
-                .WithMany()
-                .HasForeignKey(s => s.DriverId)
+            // ── OrderTransaction / SettlementBatch（M4 修復：Settlement 拆分）──
+            builder.Entity<OrderTransaction>()
+                .HasOne(t => t.Order)
+                .WithOne(o => o.Transaction)
+                .HasForeignKey<OrderTransaction>(t => t.OrderId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            builder.Entity<Settlement>()
-                .HasOne(s => s.Owner)
+            builder.Entity<OrderTransaction>()
+                .HasOne(t => t.Owner)
                 .WithMany()
-                .HasForeignKey(s => s.OwnerId)
+                .HasForeignKey(t => t.OwnerId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Settlement 跟 Order 的關聯也要 Restrict
-            builder.Entity<Settlement>()
-                .HasOne(s => s.Order)
-                .WithOne(o => o.Settlement)
-                .HasForeignKey<Settlement>(s => s.OrderId)
+            builder.Entity<OrderTransaction>()
+                .HasOne(t => t.Driver)
+                .WithMany()
+                .HasForeignKey(t => t.DriverId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // 一筆交易的店家分潤跟外送員分潤是兩個獨立的批次歸屬，各自設一條 Restrict 的關聯
+            builder.Entity<OrderTransaction>()
+                .HasOne(t => t.OwnerSettlementBatch)
+                .WithMany(b => b.OwnerTransactions)
+                .HasForeignKey(t => t.OwnerSettlementBatchId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<OrderTransaction>()
+                .HasOne(t => t.DriverSettlementBatch)
+                .WithMany(b => b.DriverTransactions)
+                .HasForeignKey(t => t.DriverSettlementBatchId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<SettlementBatch>()
+                .HasOne(b => b.Payee)
+                .WithMany()
+                .HasForeignKey(b => b.PayeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // 同一個收款人、同一個月份最多只能有一個批次，不然「產生本月結算批次」按兩次會重複入帳
+            builder.Entity<SettlementBatch>()
+                .HasIndex(b => new { b.PayeeId, b.Year, b.Month })
+                .IsUnique();
 
             // ── Order ────────────────────────────────────────
             // V-10 修復：OrderNumber 原本沒有 unique 約束，碰撞會安靜地產生兩張同編號的訂單。
@@ -135,8 +159,20 @@ namespace Yustore.Data
                 .Property(i => i.Subtotal)
                 .HasColumnType("decimal(10,2)");
 
-            builder.Entity<Settlement>()
-                .Property(s => s.FoodAmount)
+            builder.Entity<OrderTransaction>()
+                .Property(t => t.GrossAmount)
+                .HasColumnType("decimal(10,2)");
+            builder.Entity<OrderTransaction>()
+                .Property(t => t.PlatformFee)
+                .HasColumnType("decimal(10,2)");
+            builder.Entity<OrderTransaction>()
+                .Property(t => t.RestaurantPayout)
+                .HasColumnType("decimal(10,2)");
+            builder.Entity<OrderTransaction>()
+                .Property(t => t.DriverPayout)
+                .HasColumnType("decimal(10,2)");
+            builder.Entity<SettlementBatch>()
+                .Property(b => b.TotalAmount)
                 .HasColumnType("decimal(10,2)");
         }
     }

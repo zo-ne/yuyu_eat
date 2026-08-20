@@ -18,6 +18,8 @@ namespace Yustore.Filters
     //   零 DB 查詢就能擋掉「角色不對」這個最常見的情況。只有角色對得上時才需要查一次 DB，
     //   目的是驗證 IsActive——這個狀態可能隨時被管理員改變，Claims 是登入當下的快照，
     //   沒辦法保證即時，所以停權檢查刻意不走 Claims，寧可多這一次查詢也要確保即時生效。
+    // - M4 修復（V-08）：老闆/外送師還要另外檢查 ApplicationStatus 是不是 Approved——
+    //   註冊只代表送出申請，要 Admin 審核通過才能真的使用這個角色的功能。
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
     public class RoleRequiredAttribute : ActionFilterAttribute
     {
@@ -44,6 +46,13 @@ namespace Yustore.Filters
             var user = await userManager.GetUserAsync(context.HttpContext.User);
 
             if (user == null || !user.IsActive)
+            {
+                context.Result = new ForbidResult();
+                return;
+            }
+
+            // 顧客免審核；老闆/外送師/管理員都需要 ApplicationStatus 是 Approved 才能用該角色的功能
+            if (_role != UserRole.Customer && user.ApplicationStatus != ApplicationStatus.Approved)
             {
                 context.Result = new ForbidResult();
                 return;

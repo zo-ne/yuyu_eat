@@ -26,7 +26,7 @@ namespace Yustore.Models.Entities
 
         public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
         public Delivery? Delivery { get; set; }
-        public Settlement? Settlement { get; set; }
+        public OrderTransaction? Transaction { get; set; } // M4 修復：Settlement 拆成 OrderTransaction + SettlementBatch
         public ICollection<Review> Reviews { get; set; } = new List<Review>();
     }
 }

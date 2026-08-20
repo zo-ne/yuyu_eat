@@ -87,13 +87,11 @@ dotnet run --project Yustore
 
 預設會在 `http://localhost:5247` 啟動（見 [`Yustore/Properties/launchSettings.json`](Yustore/Properties/launchSettings.json)）。
 
-### 5. 開通老闆／外送師帳號（M1 起適用）
+### 5. 開通老闆／外送師帳號（M4 起：走 Admin 審核後台）
 
-註冊「老闆」或「外送師」身分後，帳號預設是 `IsActive = false`（V-08 修復：防止任何人自行註冊成店家/外送員），要等審核通過才能使用相關功能。目前還沒有 Admin 後台（排在 M4），開發階段要手動用 SQL 開通：
+註冊「老闆」或「外送師」身分後，帳號的 `ApplicationStatus` 預設是 `Pending`（V-08 修復：防止任何人自行註冊成店家/外送員），要等 Admin 審核通過才能使用相關功能。`IsActive` 現在是獨立的停權旗標，跟審核狀態脫鉤。
 
-```sql
-UPDATE AspNetUsers SET IsActive = 1 WHERE Email = 'owner@example.com';
-```
+用預設種子帳號登入 Admin 後台審核（帳密走環境變數，見 [`.env.example`](.env.example) 的 `ADMIN_SEED_EMAIL`/`ADMIN_SEED_PASSWORD`；沒設定就用程式碼裡的預設值 `admin@yuyueat.local` / `ChangeMe123!`，**正式部署前務必改掉**），登入後在導覽列點「🛠️ 管理後台 → 📋 審核佇列」核准或退回申請。
 
 顧客帳號不受影響，驗證 Email 後即可直接使用。
 
@@ -114,7 +112,7 @@ docker compose up --build
 dotnet test Yustore.Tests
 ```
 
-目前是單元測試（xUnit + FluentAssertions），優先覆蓋 [`docs/ASSESSMENT.md`](docs/ASSESSMENT.md) 點名的核心邏輯：購物車金額計算與使用者隔離、訂單狀態轉換白名單、評價授權判定、enum 顯示名稱。不含整合測試（不需要跑資料庫），CI 用同一條指令跑，見 [`.github/workflows/ci.yml`](.github/workflows/ci.yml)。
+目前是單元測試（xUnit + FluentAssertions，共 85 個），優先覆蓋 [`docs/ASSESSMENT.md`](docs/ASSESSMENT.md) 點名的核心邏輯：購物車金額計算與使用者隔離、訂單狀態轉換白名單、評價授權判定、enum 顯示名稱、結算分潤金額計算、Admin 審核／停權／訂單篩選邏輯。不含整合測試（不需要跑資料庫），CI 用同一條指令跑，見 [`.github/workflows/ci.yml`](.github/workflows/ci.yml)。
 
 ## 資料模型
 
@@ -127,14 +125,18 @@ erDiagram
     Restaurant ||--o{ Order : "接到"
     Order ||--o{ OrderItem : "包含"
     Order ||--o| Delivery : "一對一"
-    Order ||--o| Settlement : "一對一"
+    Order ||--o| OrderTransaction : "一對一(分潤明細)"
     Order ||--o{ Review : "產生"
     MenuItem ||--o{ OrderItem : "被點(Restrict，軟刪除)"
     ApplicationUser ||--o{ Delivery : "配送(外送員)"
-    ApplicationUser ||--o{ Settlement : "結算(外送員/老闆)"
+    ApplicationUser ||--o{ OrderTransaction : "分潤(店家/外送員)"
+    ApplicationUser ||--o{ SettlementBatch : "月結批次(收款人)"
+    OrderTransaction }o--o| SettlementBatch : "併入月結批次"
 ```
 
-八張資料表：`ApplicationUser`（繼承 Identity）、`Restaurant`、`MenuItem`、`Order`、`OrderItem`、`Delivery`、`Settlement`、`Review`。金額欄位一律 `decimal(10,2)`。`OrderItem → MenuItem` 為 `Restrict`（刪餐點不會牽連歷史訂單），`MenuItem` 刪除採軟刪除（`IsDeleted`），`OrderItem` 額外保留 `MenuItemName` 名稱快照。
+九張資料表：`ApplicationUser`（繼承 Identity，含 `Role`/`IsActive`/`ApplicationStatus`）、`Restaurant`、`MenuItem`、`Order`、`OrderItem`、`Delivery`、`OrderTransaction`、`SettlementBatch`、`Review`。金額欄位一律 `decimal(10,2)`。`OrderItem → MenuItem` 為 `Restrict`（刪餐點不會牽連歷史訂單），`MenuItem` 刪除採軟刪除（`IsDeleted`），`OrderItem` 額外保留 `MenuItemName` 名稱快照。
+
+M4 把原本「寫了沒人讀」的 `Settlement` 單一資料表拆成兩張：`OrderTransaction` 是每筆訂單完成當下就寫入的分潤明細（餐費依 15% 平台抽成拆給店家、外送費全額歸外送員），`SettlementBatch` 是 Admin 手動觸發「產生本月結算批次」時，把某收款人（老闆或外送員）當月還沒結算的 `OrderTransaction` 加總成一筆，兩者是多對一（同一收款人/月份的批次唯一，見 unique 索引）。
 
 ## 專案文件
 
@@ -150,10 +152,10 @@ erDiagram
 
 ## 已知限制
 
-目前處於 [`docs/PRD-v2.md`](docs/PRD-v2.md) 規劃的 **M0（止血）+ M1（安全與正確性）+ M2（工程實務）+ M3（架構重構，大部分完成）** 之後的狀態：[`docs/ASSESSMENT.md`](docs/ASSESSMENT.md) 列出的全部 17 項安全/正確性漏洞（V-01 ~ V-17）都已修復，enum 全面改英文命名，補上單元測試（71 個）、CI、Docker、Serilog、`.editorconfig`；四個業務網域（訂單/店家/結算/評價）都已抽成 Service 層（`IOrderService`/`IRestaurantService`/`ISettlementService`/`IReviewService`），Controller 只剩接資料、呼叫 Service、回應；角色改用 Claims（`_Layout` 不再查 DB），寄信改背景佇列，四個原本零分頁的列表頁加上分頁。下列項目仍在後續里程碑中：
+目前處於 [`docs/PRD-v2.md`](docs/PRD-v2.md) 規劃的 **M0（止血）+ M1（安全與正確性）+ M2（工程實務）+ M3（架構重構）+ M4（治理與商業模式）** 之後的狀態：[`docs/ASSESSMENT.md`](docs/ASSESSMENT.md) 列出的全部 17 項安全/正確性漏洞（V-01 ~ V-17）都已修復，enum 全面改英文命名，補上單元測試（85 個）、CI、Docker、Serilog、`.editorconfig`；五個業務網域（訂單/店家/結算/評價/治理）都已抽成 Service 層（`IOrderService`/`IRestaurantService`/`ISettlementService`/`IReviewService`/`IAdminService`），Controller 只剩接資料、呼叫 Service、回應；角色改用 Claims（`_Layout` 不再查 DB），寄信改背景佇列，四個原本零分頁的列表頁加上分頁；老闆／外送師改走申請制（`ApplicationStatus`），新增 Admin 治理後台（審核佇列、停權管理、全平台訂單總覽、結算批次管理），結算邏輯拆成 `OrderTransaction`（單筆分潤）+ `SettlementBatch`（月結批次），15% 平台抽成商業模式正式落地。下列項目仍在後續里程碑中：
 
 - 金流為模擬付款，尚未串接真實金流（M5）
-- 尚無 Admin 治理後台，老闆／外送師帳號審核目前只能手動改 `IsActive`（M4）
+- 尚無即時通知（SignalR），訂單狀態更新仍需手動整頁重新整理（M5）
 - DTO 投影（`.Select()` 取代 `.Include()`）只套用在有加分頁的查詢，沒有全站通盤重構（M3 後續）
 - 只有單元測試，沒有整合測試；沒有設覆蓋率門檻
 - Session 用記憶體、上傳檔案存本機磁碟，尚未支援水平擴展

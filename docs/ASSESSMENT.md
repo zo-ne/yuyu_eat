@@ -380,13 +380,13 @@ wwwroot/uploads/menu/…{png,HEIC}
 | V-05 | 🟠 High | 訂單狀態可任意跳轉,繞過付款 | OwnerController.cs:297 | ✅ 已修復（M1） |
 | V-06 | 🟠 High | 上傳零驗證 → 儲存型 XSS + 磁碟耗盡 | ImageService.cs:13 | ✅ 已修復（M1） |
 | V-07 | 🟠 High | 登入無鎖定無限流,可暴力破解 | AccountController.cs:166 | ✅ 已修復（M1） |
-| V-08 | 🟠 High | 可自由註冊成老闆/外送師,並收割全平台地址 | RegisterViewModel.cs:33 | ✅ 已修復（M1，簡易版：IsActive 審核制） |
+| V-08 | 🟠 High | 可自由註冊成老闆/外送師,並收割全平台地址 | RegisterViewModel.cs:33 | ✅ 已修復（M1 先用 IsActive 頂著；M4 換成正式的 `ApplicationStatus` 申請制 + Admin 審核後台，`IsActive` 改回單純的停權旗標） |
 | V-09 | 🟡 Medium | 購物車不綁使用者,換人登入會繼承 | CartService.cs:9 | ✅ 已修復（M1） |
 | V-10 | 🟡 Medium | 訂單編號會碰撞且無 unique 約束 | CustomerController.cs:183 | ✅ 已修復（M1） |
 | V-11 | 🟡 Medium | 搶單競態條件 → 500 而非友善訊息 | DriverController.cs:87 | ✅ 已修復（M1） |
 | V-12 | 🟡 Medium | 生產環境錯誤頁不存在 | Program.cs:63 | ✅ 已修復（M0） |
 | V-13 | 🟡 Medium | Email 未 HTML 編碼,可注入釣魚連結 | AccountController.cs:84 | ✅ 已修復（M1） |
-| V-14 | 🟢 Low | IsActive 停權欄位從未被使用 | ApplicationUser.cs:16 | ✅ 已修復（M1） |
+| V-14 | 🟢 Low | IsActive 停權欄位從未被使用 | ApplicationUser.cs:16 | ✅ 已修復（M1；M4 新增 Admin 停權管理頁面，實際可以在後台把它切換） |
 | V-15 | 🟢 Low | 缺 CSP 等安全標頭 | Program.cs | ✅ 已修復（M1） |
 | V-16 | 🟢 Low | 顧客照片 commit 進版控 | wwwroot/uploads/ | ✅ 已修復（M0） |
 | V-17 | 🟢 Low | appsettings.json 在版控且無機密管理規範 | appsettings.json | ✅ 已修復（M0） |
@@ -396,6 +396,8 @@ wwwroot/uploads/menu/…{png,HEIC}
 > M2（`m2-engineering-practices` 分支）另外補上：Docker/docker-compose、xUnit 單元測試（43 個，覆蓋 §6 建議的購物車/狀態機/評價授權邏輯）、GitHub Actions CI、Serilog 結構化日誌、`.editorconfig` + `Directory.Build.props`（`TreatWarningsAsErrors`）。§3.2 表格裡「自動化測試」「CI/CD」兩項落差已補上。
 >
 > M3 補上：P-01/P-02/P-05/P-07、Options Pattern（`EmailSettings`）、角色改用 Claims（`_Layout`/`RoleRequiredAttribute` 零多餘 DB 查詢）、全站分頁（4 個列表頁）、**Service 層四拆全完成**——`IOrderService`/`IRestaurantService`/`ISettlementService`/`IReviewService`，四個 Controller（Customer/Owner/Driver/Review）業務邏輯全部搬進 Service 層，累計 71 個單元測試，並用 Docker 實際跑過端到端驗證。§3.2 表格裡「分層架構」落差已補上；DTO 投影沒做全站通盤重構，詳見 [PRD-v2.md §8「M3 完成範圍說明」](./PRD-v2.md#m3-完成範圍說明)。
+>
+> M4（`m4-admin-governance` 分支）補上本節下方「與業界差距」點名的兩個缺口：**Admin 管理後台**（新增 `AdminController` + `IAdminService`：審核佇列、停權管理、全平台訂單總覽、結算批次管理）跟**結算查詢介面**（`Settlement` 只寫不讀的舊表拆成 `OrderTransaction`+`SettlementBatch`，Admin 可以在後台實際看到/產生月結批次，15% 平台抽成商業模式正式落地）。老闆/外送師註冊改成正式的 `ApplicationStatus` 申請制，取代 M1 當時用 `IsActive` 頂著的簡化版。累計 85 個單元測試，同樣用 Docker 端到端驗證過（含「註冊 → 審核中 → Admin 核准/退回 → 停權」完整流程）。詳見 [PRD-v2.md §8「M4 完成範圍說明」](./PRD-v2.md#m4-完成範圍說明)。
 
 **做對的地方**(這些要在面試時講出來):
 - ✅ 全域 `AuthorizeFilter` fail-closed 預設拒絕 — 比大多數學習專案好
@@ -626,6 +628,8 @@ public enum UserRole   { 顧客 = 0, 外送師 = 1, 老闆 = 2 }
 | **店家資料編輯 / 暫停營業** | `IsOpen` 欄位存在但沒有 UI |
 
 > 注意 `IsActive`、`IsOpen`、`AvatarUrl`、`Delivery.Note`、`Settlement.Note` 這幾個欄位:**定義了、進了資料庫、但完全沒被使用**。這是設計時想到但沒做完的痕跡,面試官看到會問。
+>
+> **M4 更新**：上表「Admin 管理後台」「結算查詢介面」「停權機制」三項已在 `m4-admin-governance` 補上（新增 `AdminController`/`IAdminService`、`Settlement` 拆成 `OrderTransaction`+`SettlementBatch`、`IsActive` 真正被 `RoleRequiredAttribute` 跟 Admin 後台讀取/寫入）。`Settlement.Note` 隨著舊表一起移除，其餘（真實金流、忘記密碼、取消訂單、個人資料編輯、店家資料編輯）仍是缺口，留給後續里程碑。
 
 ### 5.2 顧客體驗
 

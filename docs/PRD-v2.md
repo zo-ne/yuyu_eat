@@ -202,7 +202,7 @@
 | **M1：安全與正確性** | V-04~V-11/V-13~V-15 全部修復；enum 改英文；圖片上傳改用 ImageSharp | ASSESSMENT §6 階段 1 | 1 週 | ✅ 完成（`m1-security-hardening`） |
 | **M2：工程實務** | Docker、xUnit 單元測試、GitHub Actions CI、Serilog、`.editorconfig` | ASSESSMENT §6 階段 2 | 1~1.5 週 | ✅ 完成（`m2-engineering-practices`） |
 | **M3：架構重構** | Service 層拆分、DTO 投影、Options Pattern、分頁、角色改用 Claims | ASSESSMENT §6 階段 3 | 1.5~2 週 | 🟡 大部分完成（`m3-architecture-refactor` + `m3b-restaurant-settlement-review-services`，DTO 投影未做全站通盤重構，見下方說明） |
-| **M4：治理與商業模式** | Admin 後台（審核/停權/訂單總覽）、申請制上線、`Settlement` 拆分為分潤+月結批次 | 本文件 §5.6, §7 | 1.5~2 週 |
+| **M4：治理與商業模式** | Admin 後台（審核/停權/訂單總覽）、申請制上線、`Settlement` 拆分為分潤+月結批次 | 本文件 §5.6, §7 | 1.5~2 週 | ✅ 完成（`m4-admin-governance`） |
 | **M5：真實金流 + 即時推播** | ECPay/NewebPay Sandbox 串接、SignalR `OrderHub`、未登入首頁與店家卡片視覺改造 | 本文件 §5.8, §5.9；ROADMAP §1, §3.3 | 2 週 |
 | **M6：雲端部署** | Dockerfile 上雲、環境變數/Key Vault 設定、Demo 帳號準備、README 補上架構圖與網址 | 本文件 §6.3 | 3~5 天 |
 
@@ -215,7 +215,7 @@
 - **Service 層拆分（§3.1/§3.2）四個都做完了**：
   - `IOrderService`：結帳重新驗價、付款、狀態轉換白名單（`OrderServiceTests` 11 個情境）
   - `IRestaurantService`：店家搜尋/詳情、店家建立、菜單 CRUD（軟刪除）（`RestaurantServiceTests` 8 個情境）
-  - `ISettlementService`：外送完成時建立結算記錄（`SettlementServiceTests` 2 個情境）——目前只有「寫入」，完整的分潤/月結批次查詢介面留給 M4（見 §4 商業模式）
+  - `ISettlementService`：外送完成時建立結算記錄（`SettlementServiceTests` 2 個情境）——當時只有「寫入」，完整的分潤/月結批次查詢介面在 M4 補齊
   - `IReviewService`：評價授權判定、建立評價、R-4 完成條件（`ReviewServiceTests` 7 個情境，搭配 M2 就有的 `ReviewAuthorizationTests` 涵蓋純邏輯部分）
   - 四個 Controller（Customer/Owner/Driver/Review）現在都只負責接資料、呼叫 Service、把結果轉成 HTTP 回應，業務邏輯全部在 Service 層，且都有單元測試涵蓋
 - P-01（老闆後台統計數字只算最近 10 筆）、P-02（評分平均值撈整張表進記憶體，改用 `AverageAsync`/`CountAsync`）、P-05（寄信擋住 HTTP 請求，改成 `IEmailQueue` + `EmailBackgroundService` 背景佇列）、P-07（角色 Filter 重複三份，M1 已合併，這次補上 Claims 化）
@@ -228,6 +228,19 @@
 - DTO 投影（`.Select()` 取代 `.Include()` 整包實體）只套用在有加分頁的幾個查詢，沒有對全專案做一次通盤的投影重構
 - `Restaurant.RatingSum`/`RatingCount` 快取欄位沒有做——用 `AverageAsync` 直接讓 SQL Server 算，在這個專案的資料量下已經足夠正確又夠快，快取欄位的維護成本（每次評分寫入都要同步更新）目前換不到明顯效益，先不做
 
+### M4 完成範圍說明
+
+**已完成**：
+- **商業模式落地（§4）**：`Settlement` 單一資料表拆成 `OrderTransaction`（外送完成當下寫入的單筆分潤：餐費依 15% 平台抽成拆給店家、外送費全額歸外送員）+ `SettlementBatch`（Admin 手動觸發，把某收款人當月還沒結算的交易加總成一筆），`GenerateMonthlyBatchesAsync` 重複執行時會把新交易併入既有批次而不是撞 unique 索引炸掉（`SettlementServiceTests` 5 個情境）
+- **申請制上線（§5.2/§5.4/§5.5）**：新增 `UserRole.Admin` 與 `ApplicationStatus`（Pending/Approved/Rejected），`AccountController.Register` 拒絕直接 POST `Role=Admin`、老闆/外送師註冊後預設 `Pending`；`IsActive` 現在是獨立的停權旗標，跟審核狀態脫鉤；`RoleRequiredAttribute` 補上 `ApplicationStatus` 檢查；`Login` 對「已停權」跟「審核中/已拒絕」分別給出不同訊息
+- **`AdminController`（全新模組，§5.6）**：審核佇列（核准/退回附理由）、使用者停權管理（依角色篩選，Admin 帳號本身不可透過此介面停權）、全平台訂單總覽（依狀態/日期區間/店家篩選）、結算批次管理（產生/檢視，沿用 `ISettlementService`），邏輯集中在新的 `IAdminService`（`AdminServiceTests` 11 個情境）
+- Admin 帳號透過 `Program.cs` 啟動時的 Data Seeding 建立，帳密走環境變數（`AdminSeed:Email`/`AdminSeed:Password`，對應 `.env` 的 `ADMIN_SEED_EMAIL`/`ADMIN_SEED_PASSWORD`），不寫死在程式碼裡、沒有自助註冊入口
+- 全套改動用 Docker 實際跑過一次端到端驗證：註冊老闆帳號 → 確認 `ApplicationStatus=Pending`/`IsActive=1` → Admin 登入核准 → 資料庫確認狀態翻轉 → Admin 停權該帳號 → 資料庫確認 `IsActive` 翻轉；`/Admin` 系列五個路由（Index/Applications/Users/Orders/Settlements）皆回應 200
+
+**尚未完成，留給下一輪**：
+- SignalR 即時通知、真實金流串接（M5 範圍，PRD §5.8/§5.9 本來就沒排進 M4）
+- Admin 訂單總覽目前只有篩選查詢，沒有能力代替使用者取消/介入訂單狀態（M4 §5.6 原本就沒有這個需求）
+
 ---
 
 ## 9. 驗收標準（Definition of Done）
@@ -235,9 +248,9 @@
 - [x] ASSESSMENT.md 中列出的所有 🔴 Critical、🟠 High 漏洞狀態改為「已修復」（M0+M1，全部 17 項）
 - [x] `dotnet test` 在 CI 中全數通過，且覆蓋訂單金額計算、狀態機、購物車、評價授權四個核心邏輯（M2，43 個測試）
 - [x] GitHub Actions 在每次 push / PR 自動跑 build + test，README 顯示徽章（M2；分支合併回 main 後才會實際跑一次確認變綠）
-- [ ] `docker compose up` 可在乾淨環境一鍵啟動整個系統（app + DB）（Dockerfile/compose 已完成並過 `docker compose config` 語法檢查，但撰寫當下本機 Docker Desktop 沒開機，尚未實際跑過完整啟動，待手動驗證）
-- [ ] 用測試帳號可完整跑完一次端到端流程：訪客瀏覽 → 顧客註冊登入 → 下單 → ECPay Sandbox 付款成功 → 老闆備餐（狀態即時推播給顧客）→ 外送員接單送達 → 三方互評 → Admin 查看該月結算批次
-- [ ] Admin 可審核一筆店家／外送員申請，未審核通過者無法上架／接單
+- [x] `docker compose up` 可在乾淨環境一鍵啟動整個系統（app + DB）（M2 完成 Dockerfile/compose，M4 起實際用 `docker compose up --build` 跑過多次完整啟動 + 自動 migration + Admin 種子帳號驗證）
+- [ ] 用測試帳號可完整跑完一次端到端流程：訪客瀏覽 → 顧客註冊登入 → 下單 → ECPay Sandbox 付款成功 → 老闆備餐（狀態即時推播給顧客）→ 外送員接單送達 → 三方互評 → Admin 查看該月結算批次（金流/SignalR 是 M5 範圍，尚未串接）
+- [x] Admin 可審核一筆店家／外送員申請，未審核通過者無法上架／接單（M4，`RoleRequiredAttribute` 擋下 `ApplicationStatus != Approved` 的老闆/外送師，實際在 Docker 環境端到端驗證過）
 - [ ] 部署網址可公開存取，附測試帳號可直接操作
 - [x] enum 全部為英文，View 顯示透過 `[Display]`（M1）
 - [ ] README 包含：專案介紹、架構圖、ER 圖、技術棧、啟動方式、Demo 網址與帳號

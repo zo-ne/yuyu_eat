@@ -52,20 +52,36 @@ namespace Yustore.Controllers
             if (!ModelState.IsValid)
                 return View(model); // 驗證失敗，把資料還給頁面顯示錯誤
 
+            // M4 修復：RegisterViewModel.Role 沒有任何 [Range] 限制，表單雖然只會出現
+            // 顧客／老闆／外送師三個選項，但直接對這個 Action POST Role=3（Admin）
+            // 一樣會通過模型驗證。Admin 沒有自助註冊這條路——只能由後端種子帳號建立，
+            // 這裡明確擋下，不要相信前端表單限制了什麼。
+            if (model.Role == UserRole.Admin)
+            {
+                ModelState.AddModelError(string.Empty, "無法以此身份註冊。");
+                return View(model);
+            }
+
             // V-08 修復：原本任何人只要有 Email，就能自己註冊成「老闆」開店賣東西，
             // 或註冊成「外送師」看到所有待取餐訂單的顧客姓名與外送地址——
             // 這在真實外送平台是不可能的，店家要營業登記、外送員要身分驗證，也是個資外洩途徑。
-            // 這裡先做簡單版：老闆／外送師註冊後帳號預設不啟用（IsActive = false），
-            // RoleRequiredAttribute 會擋下未啟用帳號進入 Owner/Driver 的所有功能，
-            // 要等待審核（目前只能由後端人員手動開通，Admin 審核後台排在後續里程碑）才能真正使用。
-            // 顧客不受影響，註冊後可以馬上用。
+            // M4 修復：原本用 IsActive = false 代表「還沒審核」，但 IsActive 同時也是
+            // Admin 停權用的欄位，兩件事混在同一個布林值裡分不清楚——一個被停權的顧客
+            // 跟一個還在等審核的老闆，看起來會是同一個狀態。現在拆開：
+            // IsActive 一律先設 true（純粹的停權旗標，預設沒被停權），
+            // 審核與否改看 ApplicationStatus。顧客免審核直接 Approved；
+            // 老闆／外送師預設 Pending，RoleRequiredAttribute 會擋下未核准帳號進入
+            // Owner/Driver 的所有功能，要等 Admin 審核後台（M4）核准後才能真正使用。
             var user = new ApplicationUser
             {
                 UserName = model.Email,
                 Email = model.Email,
                 FullName = model.FullName,
                 Role = model.Role,
-                IsActive = model.Role == UserRole.Customer
+                IsActive = true,
+                ApplicationStatus = model.Role == UserRole.Customer
+                    ? ApplicationStatus.Approved
+                    : ApplicationStatus.Pending
             };
 
             // CreateAsync：建立使用者並把密碼雜湊後存入資料庫
@@ -107,7 +123,7 @@ namespace Yustore.Controllers
                 ));
 
                 // 跳到「請去收信」提示頁面
-                TempData["Message"] = user.IsActive
+                TempData["Message"] = user.ApplicationStatus == ApplicationStatus.Approved
                     ? $"註冊成功！驗證信已寄到 {user.Email}，請去收信並點擊驗證連結。"
                     : $"註冊成功！驗證信已寄到 {user.Email}，請先去收信驗證 Email。" +
                       "驗證完成後，您的帳號還需要等待平台審核通過，才能使用老闆／外送師的功能。";
@@ -191,13 +207,28 @@ namespace Yustore.Controllers
                 // 登入成功，依角色跳到不同頁面
                 var user = await _userManager.FindByEmailAsync(model.Email);
 
-                // V-08 修復：老闆／外送師帳號如果還沒被審核通過（IsActive = false），
-                // 直接導去 Owner/Driver 首頁只會被 RoleRequiredAttribute 擋成一個生硬的 403。
-                // 這裡先攔下來，給一個看得懂在等什麼的訊息。
-                if (user!.Role != UserRole.Customer && !user.IsActive)
+                // M4 修復：帳號被停權（IsActive = false）跟帳號還在等審核（ApplicationStatus
+                // != Approved）是兩件不同的事，要給使用者看得懂的不同訊息，不能都導去首頁裝沒事。
+                if (!user!.IsActive)
+                {
+                    TempData["Error"] = "您的帳號已被停權，如有疑問請聯繫平台客服。";
+                    await _signInManager.SignOutAsync();
+                    return RedirectToAction("Login");
+                }
+
+                // V-08 修復：老闆／外送師帳號如果還沒被審核通過，直接導去 Owner/Driver 首頁
+                // 只會被 RoleRequiredAttribute 擋成一個生硬的 403。這裡先攔下來，給一個看得懂
+                // 在等什麼（或為什麼被拒絕）的訊息。
+                if (user.Role != UserRole.Customer && user.ApplicationStatus != ApplicationStatus.Approved)
                 {
                     var roleName = user.Role == UserRole.Owner ? "老闆" : "外送師";
-                    TempData["Message"] = $"您的{roleName}帳號正在等待平台審核，審核通過後即可使用相關功能。";
+
+                    TempData["Message"] = user.ApplicationStatus == ApplicationStatus.Rejected
+                        ? $"很抱歉，您的{roleName}帳號申請未通過審核。" +
+                          (string.IsNullOrWhiteSpace(user.ApplicationRejectionReason)
+                              ? ""
+                              : $"原因：{user.ApplicationRejectionReason}")
+                        : $"您的{roleName}帳號正在等待平台審核，審核通過後即可使用相關功能。";
                     return RedirectToAction("Index", "Home");
                 }
 

@@ -1,0 +1,68 @@
+@{
+    ViewData["Title"] = "管理後台";
+}
+
+<div class="container mt-4">
+
+    @if (TempData["Message"] != null)
+    {
+        <div class="alert alert-success">@TempData["Message"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+
+    <h3 class="mb-4">🛠️ 管理後台</h3>
+
+    <div class="row g-3">
+        <div class="col-md-6 col-lg-3">
+            <a asp-action="Applications" class="text-decoration-none">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">📋 審核佇列</h5>
+                        <p class="card-text text-muted">老闆／外送師申請審核</p>
+                        @if ((int)ViewBag.PendingCount > 0)
+                        {
+                            <span class="badge bg-danger">@ViewBag.PendingCount 筆待審核</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">目前沒有待審核申請</span>
+                        }
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <a asp-action="Users" class="text-decoration-none">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">👥 使用者管理</h5>
+                        <p class="card-text text-muted">查看帳號、停權／恢復</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <a asp-action="Orders" class="text-decoration-none">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">🧾 訂單總覽</h5>
+                        <p class="card-text text-muted">全平台訂單，可依狀態/日期/店家篩選</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <a asp-action="Settlements" class="text-decoration-none">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">💰 結算批次</h5>
+                        <p class="card-text text-muted">產生／檢視每月結算批次</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
