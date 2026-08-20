@@ -6,6 +6,8 @@
 
 ASP.NET Core 8 MVC · EF Core 8 · SQL Server · ASP.NET Core Identity
 
+[![CI](https://github.com/zo-ne/yuyu_eat/actions/workflows/ci.yml/badge.svg)](https://github.com/zo-ne/yuyu_eat/actions/workflows/ci.yml)
+
 </div>
 
 ---
@@ -28,6 +30,10 @@ YUYUEAT 是一個以 ASP.NET Core 8 MVC 開發的餐點外送系統，涵蓋顧�
 | 郵件 | MailKit（Gmail SMTP） |
 | 影像 | SixLabors.ImageSharp |
 | 前端 | Bootstrap 5 + jQuery + jQuery Validation |
+| 日誌 | Serilog（結構化日誌 + CorrelationId，寫 Console 與檔案） |
+| 測試 | xUnit + FluentAssertions |
+| CI | GitHub Actions（restore → build → test） |
+| 容器化 | Docker + docker-compose（app + SQL Server 2022） |
 
 ## 功能總覽
 
@@ -91,6 +97,25 @@ UPDATE AspNetUsers SET IsActive = 1 WHERE Email = 'owner@example.com';
 
 顧客帳號不受影響，驗證 Email 後即可直接使用。
 
+## 用 Docker 啟動（不想裝 SQL Server 的話）
+
+不想在本機裝 SQL Server 的話，用 Docker Compose 一鍵把 app 跟資料庫都跑起來：
+
+```bash
+cp .env.example .env   # 改一下裡面的 DB_SA_PASSWORD
+docker compose up --build
+```
+
+啟動後在 `http://localhost:8080` 開網站。第一次啟動時 app 會自動套用 EF Core migration 建好資料庫，不用手動下 `dotnet ef database update`。要清掉資料重來就 `docker compose down -v`（連同 volume 一起刪）。
+
+## 跑測試
+
+```bash
+dotnet test Yustore.Tests
+```
+
+目前是單元測試（xUnit + FluentAssertions），優先覆蓋 [`docs/ASSESSMENT.md`](docs/ASSESSMENT.md) 點名的核心邏輯：購物車金額計算與使用者隔離、訂單狀態轉換白名單、評價授權判定、enum 顯示名稱。不含整合測試（不需要跑資料庫），CI 用同一條指令跑，見 [`.github/workflows/ci.yml`](.github/workflows/ci.yml)。
+
 ## 資料模型
 
 ```mermaid
@@ -125,12 +150,12 @@ erDiagram
 
 ## 已知限制
 
-目前處於 [`docs/PRD-v2.md`](docs/PRD-v2.md) 規劃的 **M0（止血）+ M1（安全與正確性）** 完成後的狀態：[`docs/ASSESSMENT.md`](docs/ASSESSMENT.md) 列出的全部 17 項安全/正確性漏洞（V-01 ~ V-17）都已修復，enum 也已全面改為英文命名。下列項目仍在後續里程碑中：
+目前處於 [`docs/PRD-v2.md`](docs/PRD-v2.md) 規劃的 **M0（止血）+ M1（安全與正確性）+ M2（工程實務）** 完成後的狀態：[`docs/ASSESSMENT.md`](docs/ASSESSMENT.md) 列出的全部 17 項安全/正確性漏洞（V-01 ~ V-17）都已修復，enum 也已全面改為英文命名，並補上單元測試、CI、Docker、Serilog、`.editorconfig`。下列項目仍在後續里程碑中：
 
 - 金流為模擬付款，尚未串接真實金流（M5）
 - 尚無 Admin 治理後台，老闆／外送師帳號審核目前只能手動改 `IsActive`（M4）
-- 尚無自動化測試與 CI、無 Docker（M2）
-- 老闆後台統計數字只算最近 10 筆訂單（P-01）、`_Layout` 有多餘的 DB 查詢（P-03）、全站零分頁（P-04）等效能項目尚未處理（M3 架構重構階段）
+- 業務邏輯仍在 Controller 裡，沒有 Service 層；老闆後台統計數字只算最近 10 筆訂單（P-01）、`_Layout` 有多餘的 DB 查詢（P-03）、全站零分頁（P-04）等效能項目尚未處理（M3 架構重構階段）
+- 只有單元測試，沒有整合測試；沒有設覆蓋率門檻
 - Session 用記憶體、上傳檔案存本機磁碟，尚未支援水平擴展
 
 完整清單見 [`docs/ASSESSMENT.md`](docs/ASSESSMENT.md)。

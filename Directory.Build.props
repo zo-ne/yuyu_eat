@@ -1,0 +1,14 @@
+<Project>
+
+  <!-- 對整個 solution 生效（包含之後的 Yustore.Tests）。
+       ASSESSMENT.md §3.2 指出專案原本沒有任何靜態分析設定，這裡補上最基本的一組：
+       啟用 .NET 內建分析器、把警告當錯誤處理，逼自己不能放著警告不管。 -->
+  <PropertyGroup>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- NU1902/NU1903：NuGet 已知漏洞警告，另外用 dotnet list package 加 vulnerable 選項追蹤，不擋建置 -->
+    <WarningsNotAsErrors>NU1902;NU1903</WarningsNotAsErrors>
+  </PropertyGroup>
+
+</Project>

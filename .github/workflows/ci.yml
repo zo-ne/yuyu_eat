@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    # 沒限制 branches：專案用堆疊式 PR（M1 PR 對 M0 分支開、M2 對 M1 開，以此類推），
+    # 若只放行 base=main 的 PR，中間這些堆疊 PR 永遠不會觸發 CI。
+    branches: ["**"]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore Yustore.sln
+
+      - name: Build
+        run: dotnet build Yustore.sln --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test Yustore.Tests/Yustore.Tests.csproj --no-build --configuration Release --logger "trx;LogFileName=test-results.trx"
+
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: Yustore.Tests/TestResults/test-results.trx

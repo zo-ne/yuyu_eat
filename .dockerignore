@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/.git/
+**/.github/
+**/wwwroot/uploads/*
+!**/wwwroot/uploads/**/.gitkeep
+**/logs/
+**/*.md
+docs/
+.env
+.env.example
+Yustore.Tests/

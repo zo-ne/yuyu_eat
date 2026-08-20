@@ -83,7 +83,7 @@ namespace Yustore.Controllers
         // V-01 修復：伺服器端依「訂單 + 目前登入者」推導出合法的評分對象清單，
         // GET / POST Create 都必須拿這份清單驗證，不能相信表單/查詢字串傳來的 TargetUserId / TargetType。
         // ════════════════════════════════════════
-        private static List<(string TargetUserId, string TargetUserName, ReviewTargetType TargetType)> GetReviewTargets(
+        internal static List<(string TargetUserId, string TargetUserName, ReviewTargetType TargetType)> GetReviewTargets(
             Order order, ApplicationUser user)
         {
             bool isCustomer = order.CustomerId == user.Id;
@@ -121,7 +121,7 @@ namespace Yustore.Controllers
 
         // R-4 修復：列出這筆訂單「全部」應該存在的評分配對（誰評誰），跟 GetReviewTargets 不同的是
         // 這裡不是站在某一個使用者的角度，而是列出三方彼此互評的完整清單，用來判斷訂單能不能轉「完成」。
-        private static List<(string ReviewerId, string TargetUserId)> GetAllRequiredReviewPairs(Order order)
+        internal static List<(string ReviewerId, string TargetUserId)> GetAllRequiredReviewPairs(Order order)
         {
             var pairs = new List<(string, string)>
             {
