@@ -371,25 +371,27 @@ wwwroot/uploads/menu/…{png,HEIC}
 
 ### 漏洞總表
 
-| ID | 嚴重度 | 問題 | 位置 |
-|---|---|---|---|
-| V-01 | 🔴 Critical | Review/Create 無授權,可對任何人刷評價 | ReviewController.cs:157,197 |
-| V-02 | 🔴 Critical | 刪餐點連鎖刪除歷史訂單明細 | InitialCreate.cs:296 / OwnerController.cs:244 |
-| V-03 | 🟠 High | AddToCart 不驗證數量,可下負數訂單 | CustomerController.cs:95 |
-| V-04 | 🟠 High | 結帳不重驗餐點,舊價成交 / 500 | CustomerController.cs:200 |
-| V-05 | 🟠 High | 訂單狀態可任意跳轉,繞過付款 | OwnerController.cs:297 |
-| V-06 | 🟠 High | 上傳零驗證 → 儲存型 XSS + 磁碟耗盡 | ImageService.cs:13 |
-| V-07 | 🟠 High | 登入無鎖定無限流,可暴力破解 | AccountController.cs:166 |
-| V-08 | 🟠 High | 可自由註冊成老闆/外送師,並收割全平台地址 | RegisterViewModel.cs:33 |
-| V-09 | 🟡 Medium | 購物車不綁使用者,換人登入會繼承 | CartService.cs:9 |
-| V-10 | 🟡 Medium | 訂單編號會碰撞且無 unique 約束 | CustomerController.cs:183 |
-| V-11 | 🟡 Medium | 搶單競態條件 → 500 而非友善訊息 | DriverController.cs:87 |
-| V-12 | 🟡 Medium | 生產環境錯誤頁不存在 | Program.cs:63 |
-| V-13 | 🟡 Medium | Email 未 HTML 編碼,可注入釣魚連結 | AccountController.cs:84 |
-| V-14 | 🟢 Low | IsActive 停權欄位從未被使用 | ApplicationUser.cs:16 |
-| V-15 | 🟢 Low | 缺 CSP 等安全標頭 | Program.cs |
-| V-16 | 🟢 Low | 顧客照片 commit 進版控 | wwwroot/uploads/ |
-| V-17 | 🟢 Low | appsettings.json 在版控且無機密管理規範 | appsettings.json |
+| ID | 嚴重度 | 問題 | 位置 | 狀態 |
+|---|---|---|---|---|
+| V-01 | 🔴 Critical | Review/Create 無授權,可對任何人刷評價 | ReviewController.cs:157,197 | ✅ 已修復（M0 + M1 補 unique 索引/R-4） |
+| V-02 | 🔴 Critical | 刪餐點連鎖刪除歷史訂單明細 | InitialCreate.cs:296 / OwnerController.cs:244 | ✅ 已修復（M0） |
+| V-03 | 🟠 High | AddToCart 不驗證數量,可下負數訂單 | CustomerController.cs:95 | ✅ 已修復（M0） |
+| V-04 | 🟠 High | 結帳不重驗餐點,舊價成交 / 500 | CustomerController.cs:200 | ✅ 已修復（M1） |
+| V-05 | 🟠 High | 訂單狀態可任意跳轉,繞過付款 | OwnerController.cs:297 | ✅ 已修復（M1） |
+| V-06 | 🟠 High | 上傳零驗證 → 儲存型 XSS + 磁碟耗盡 | ImageService.cs:13 | ✅ 已修復（M1） |
+| V-07 | 🟠 High | 登入無鎖定無限流,可暴力破解 | AccountController.cs:166 | ✅ 已修復（M1） |
+| V-08 | 🟠 High | 可自由註冊成老闆/外送師,並收割全平台地址 | RegisterViewModel.cs:33 | ✅ 已修復（M1，簡易版：IsActive 審核制） |
+| V-09 | 🟡 Medium | 購物車不綁使用者,換人登入會繼承 | CartService.cs:9 | ✅ 已修復（M1） |
+| V-10 | 🟡 Medium | 訂單編號會碰撞且無 unique 約束 | CustomerController.cs:183 | ✅ 已修復（M1） |
+| V-11 | 🟡 Medium | 搶單競態條件 → 500 而非友善訊息 | DriverController.cs:87 | ✅ 已修復（M1） |
+| V-12 | 🟡 Medium | 生產環境錯誤頁不存在 | Program.cs:63 | ✅ 已修復（M0） |
+| V-13 | 🟡 Medium | Email 未 HTML 編碼,可注入釣魚連結 | AccountController.cs:84 | ✅ 已修復（M1） |
+| V-14 | 🟢 Low | IsActive 停權欄位從未被使用 | ApplicationUser.cs:16 | ✅ 已修復（M1） |
+| V-15 | 🟢 Low | 缺 CSP 等安全標頭 | Program.cs | ✅ 已修復（M1） |
+| V-16 | 🟢 Low | 顧客照片 commit 進版控 | wwwroot/uploads/ | ✅ 已修復（M0） |
+| V-17 | 🟢 Low | appsettings.json 在版控且無機密管理規範 | appsettings.json | ✅ 已修復（M0） |
+
+> 狀態欄更新於 M1 完成時（分支 `m1-security-hardening`）。M0/M1 涵蓋本文件列出的全部 17 項漏洞；順便處理了 enum 改英文命名、`RoleRequiredAttribute` 合併（P-07）、P-05 的存檔順序問題。**尚未處理**：P-01（老闆後台統計數字錯誤）、P-02~P-04、P-06 等其餘 §2 效能項目，留到 M3 架構重構階段，詳見 [PRD-v2.md](./PRD-v2.md) 里程碑表。
 
 **做對的地方**(這些要在面試時講出來):
 - ✅ 全域 `AuthorizeFilter` fail-closed 預設拒絕 — 比大多數學習專案好

@@ -10,7 +10,7 @@ using Yustore.ViewModels;
 namespace Yustore.Controllers
 {
     // 登入才能評分，但三種角色都可以用
-    // 所以這裡用 [Authorize] 而不是 [OwnerOnly] 之類的
+    // 所以這裡用 [Authorize] 而不是 [RoleRequired(...)] 之類的
     [Authorize]
     public class ReviewController : Controller
     {
@@ -55,7 +55,7 @@ namespace Yustore.Controllers
                 return Forbid();
 
             // 只有已送達或完成的訂單才能評分
-            if (order.Status != OrderStatus.已送達 && order.Status != OrderStatus.完成)
+            if (order.Status != OrderStatus.Delivered && order.Status != OrderStatus.Completed)
             {
                 TempData["Error"] = "訂單尚未完成，無法評分。";
                 return RedirectToAction("Index", GetRedirectController(user.Role));
@@ -95,28 +95,49 @@ namespace Yustore.Controllers
             if (isCustomer)
             {
                 // 顧客評：老闆 + 外送師
-                targets.Add((order.Restaurant.OwnerId, order.Restaurant.Owner.FullName, ReviewTargetType.老闆));
+                targets.Add((order.Restaurant.OwnerId, order.Restaurant.Owner.FullName, ReviewTargetType.Owner));
 
                 if (order.Delivery?.Driver != null)
-                    targets.Add((order.Delivery.DriverId, order.Delivery.Driver.FullName, ReviewTargetType.外送師));
+                    targets.Add((order.Delivery.DriverId, order.Delivery.Driver.FullName, ReviewTargetType.Driver));
             }
             else if (isDriver)
             {
                 // 外送師評：顧客 + 老闆
-                targets.Add((order.CustomerId, order.Customer.FullName, ReviewTargetType.顧客));
-                targets.Add((order.Restaurant.OwnerId, order.Restaurant.Owner.FullName, ReviewTargetType.老闆));
+                targets.Add((order.CustomerId, order.Customer.FullName, ReviewTargetType.Customer));
+                targets.Add((order.Restaurant.OwnerId, order.Restaurant.Owner.FullName, ReviewTargetType.Owner));
             }
             else if (isOwner)
             {
                 // 老闆評：顧客 + 外送師
-                targets.Add((order.CustomerId, order.Customer.FullName, ReviewTargetType.顧客));
+                targets.Add((order.CustomerId, order.Customer.FullName, ReviewTargetType.Customer));
 
                 if (order.Delivery?.Driver != null)
-                    targets.Add((order.Delivery.DriverId, order.Delivery.Driver.FullName, ReviewTargetType.外送師));
+                    targets.Add((order.Delivery.DriverId, order.Delivery.Driver.FullName, ReviewTargetType.Driver));
             }
             // 三種身分都不是（跟這筆訂單完全無關）→ 回傳空清單，等於沒有任何合法評分對象
 
             return targets;
+        }
+
+        // R-4 修復：列出這筆訂單「全部」應該存在的評分配對（誰評誰），跟 GetReviewTargets 不同的是
+        // 這裡不是站在某一個使用者的角度，而是列出三方彼此互評的完整清單，用來判斷訂單能不能轉「完成」。
+        private static List<(string ReviewerId, string TargetUserId)> GetAllRequiredReviewPairs(Order order)
+        {
+            var pairs = new List<(string, string)>
+            {
+                (order.CustomerId, order.Restaurant.OwnerId), // 顧客 → 老闆
+                (order.Restaurant.OwnerId, order.CustomerId),  // 老闆 → 顧客
+            };
+
+            if (order.Delivery?.DriverId != null)
+            {
+                pairs.Add((order.CustomerId, order.Delivery.DriverId));         // 顧客 → 外送師
+                pairs.Add((order.Delivery.DriverId, order.CustomerId));         // 外送師 → 顧客
+                pairs.Add((order.Delivery.DriverId, order.Restaurant.OwnerId)); // 外送師 → 老闆
+                pairs.Add((order.Restaurant.OwnerId, order.Delivery.DriverId)); // 老闆 → 外送師
+            }
+
+            return pairs;
         }
 
         // 載入 Create 需要的訂單資料，並統一做「使用者是否為訂單相關人員」「訂單狀態是否可評分」
@@ -132,13 +153,14 @@ namespace Yustore.Controllers
                 .Include(o => o.Delivery)
                     .ThenInclude(d => d!.Driver)
                 .Include(o => o.Customer)
+                .Include(o => o.Reviews) // R-4 修復要用到：判斷這筆訂單所有應評對象是否都評完了
                 .FirstOrDefaultAsync(o => o.Id == orderId);
 
             if (order == null || user == null)
                 return (null, null, default, NotFound());
 
             // 訂單狀態必須是已送達或完成才能評分（連「待付款」都能評分是 V-01 的一部分）
-            if (order.Status != OrderStatus.已送達 && order.Status != OrderStatus.完成)
+            if (order.Status != OrderStatus.Delivered && order.Status != OrderStatus.Completed)
             {
                 TempData["Error"] = "訂單尚未完成，無法評分。";
                 return (null, null, default, RedirectToAction("Index", GetRedirectController(user.Role)));
@@ -233,12 +255,22 @@ namespace Yustore.Controllers
 
             _db.Reviews.Add(review);
 
-            // 如果這筆訂單的所有評分都完成了，把訂單狀態改成「完成」
+            // R-4 修復：原本只要「任一人」評分就把訂單轉「完成」，
+            // 改成「這筆訂單所有應評對象都評完」才轉換。
             // （order 是 ValidateReviewRequestAsync 已經查過、且被同一個 _db 追蹤的實體，不用重查）
-            if (order!.Status == OrderStatus.已送達)
+            if (order!.Status == OrderStatus.Delivered)
             {
-                order.Status = OrderStatus.完成;
-                order.CompletedAt = DateTime.Now;
+                var requiredPairs = GetAllRequiredReviewPairs(order);
+                var donePairs = order.Reviews
+                    .Select(r => (r.ReviewerId, r.TargetUserId))
+                    .Append((review.ReviewerId, review.TargetUserId)) // 這筆剛加進 _db 但還沒存檔的評分也要算進去
+                    .ToHashSet();
+
+                if (requiredPairs.All(p => donePairs.Contains(p)))
+                {
+                    order.Status = OrderStatus.Completed;
+                    order.CompletedAt = DateTime.Now;
+                }
             }
 
             await _db.SaveChangesAsync();
@@ -250,8 +282,8 @@ namespace Yustore.Controllers
         // 根據角色決定返回哪個 Controller
         private string GetRedirectController(UserRole role) => role switch
         {
-            UserRole.老闆 => "Owner",
-            UserRole.外送師 => "Driver",
+            UserRole.Owner => "Owner",
+            UserRole.Driver => "Driver",
             _ => "Customer"
         };
     }

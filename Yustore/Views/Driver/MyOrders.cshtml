@@ -32,7 +32,7 @@
                         <div>
                             <strong>@delivery.Order.OrderNumber</strong>
                             <span class="ms-2 badge @GetBadge(delivery.Order.Status)">
-                                @delivery.Order.Status
+                                @delivery.Order.Status.GetDisplayName()
                             </span>
                         </div>
                         <span class="text-warning fw-bold">
@@ -91,9 +91,9 @@
 @functions {
     string GetBadge(Yustore.Enums.OrderStatus status) => status switch
     {
-        OrderStatus.外送中 => "bg-warning text-dark",
-        OrderStatus.已送達 => "bg-success",
-        OrderStatus.完成 => "bg-success",
+        OrderStatus.OutForDelivery => "bg-warning text-dark",
+        OrderStatus.Delivered => "bg-success",
+        OrderStatus.Completed => "bg-success",
         _ => "bg-secondary"
     };
 }

@@ -19,12 +19,19 @@ namespace Yustore.Services
 
         public async Task SendEmailAsync(string toEmail, string subject, string body)
         {
-            // 從 appsettings.json 讀取 Email 設定
-            var host = _config["EmailSettings:SmtpHost"];
-            var port = int.Parse(_config["EmailSettings:SmtpPort"]!);
-            var senderEmail = _config["EmailSettings:SenderEmail"];
+            // 從 appsettings.json / User Secrets 讀取 Email 設定。
+            // 這幾個值都是寄信功能運作的必要條件，缺一個就直接講清楚是哪個設定沒填，
+            // 好過讓 MailKit 在更深的地方丟出一個看不出原因的 NullReferenceException。
+            var host = _config["EmailSettings:SmtpHost"]
+                ?? throw new InvalidOperationException("缺少設定 EmailSettings:SmtpHost");
+            var port = int.Parse(_config["EmailSettings:SmtpPort"]
+                ?? throw new InvalidOperationException("缺少設定 EmailSettings:SmtpPort"));
+            var senderEmail = _config["EmailSettings:SenderEmail"]
+                ?? throw new InvalidOperationException("缺少設定 EmailSettings:SenderEmail");
             var senderName = _config["EmailSettings:SenderName"];
-            var appPassword = _config["EmailSettings:AppPassword"];
+            var appPassword = _config["EmailSettings:AppPassword"]
+                ?? throw new InvalidOperationException(
+                    "缺少設定 EmailSettings:AppPassword，本機開發請用 dotnet user-secrets 設定。");
 
             // 建立郵件內容
             var email = new MimeMessage();

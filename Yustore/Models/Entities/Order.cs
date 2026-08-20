@@ -8,7 +8,7 @@ namespace Yustore.Models.Entities
     {
         public int Id { get; set; }
         public string OrderNumber { get; set; } = string.Empty; // 例如 ORD-20240101-001
-        public OrderStatus Status { get; set; } = OrderStatus.待付款;
+        public OrderStatus Status { get; set; } = OrderStatus.PendingPayment;
         public decimal FoodTotal { get; set; }      // 餐費小計
         public decimal DeliveryFee { get; set; } = 30; // 固定外送費
         public decimal GrandTotal { get; set; }     // 總計

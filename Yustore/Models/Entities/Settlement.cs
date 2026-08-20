@@ -9,7 +9,7 @@ namespace Yustore.Models.Entities
         public int Year { get; set; }
         public int Month { get; set; }
         public decimal FoodAmount { get; set; }    // 應付老闆的餐費
-        public SettlementStatus Status { get; set; } = SettlementStatus.未結算;
+        public SettlementStatus Status { get; set; } = SettlementStatus.Unsettled;
         public DateTime? SettledAt { get; set; }
         public string? Note { get; set; }
 

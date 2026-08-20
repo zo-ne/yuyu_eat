@@ -3,46 +3,68 @@ using Yustore.Models.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Yustore.Services;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ¡õ §i¶Dµ{¦¡¡G¡u§Ú­n¥Î SQL Server ¸ê®Æ®w¡A³s½u³]©w¦b appsettings.json ¸Ì¡v
+// â†“ å‘Šè¨´ç¨‹å¼ï¼šã€Œæˆ‘è¦ç”¨ SQL Server è³‡æ–™åº«ï¼Œé€£ç·šè¨­å®šåœ¨ appsettings.json è£¡ã€
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// ¡õ §i¶Dµ{¦¡¡G¡u§Ú­n¥Î Identity ·|­û¨t²Î¡v
-//   ApplicationUser ¬O§Ú­Ì¦Û­qªº¨Ï¥ÎªÌ¡AIdentityRole ¬O¤º«Ø¨¤¦â¨t²Î
+// â†“ å‘Šè¨´ç¨‹å¼ï¼šã€Œæˆ‘è¦ç”¨ Identity æœƒå“¡ç³»çµ±ã€
+//   ApplicationUser æ˜¯æˆ‘å€‘è‡ªè¨‚çš„ä½¿ç”¨è€…ï¼ŒIdentityRole æ˜¯å…§å»ºè§’è‰²ç³»çµ±
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
-    options.SignIn.RequireConfirmedEmail = true;   // ¥²¶·ÅçÃÒ Email ¤~¯àµn¤J
-    options.Password.RequireDigit = true;           // ±K½X»İ­n¼Æ¦r
-    options.Password.RequiredLength = 8;            // ±K½X³Ì¤Ö 8 ½X
-    options.Password.RequireUppercase = false;      // ¤£±j¨î¤j¼g
-    options.Password.RequireNonAlphanumeric = false;// ¤£±j¨î¯S®í²Å¸¹
-})
-.AddEntityFrameworkStores<AppDbContext>() // Identity ªº¸ê®Æ¦s¨ì§Ú­Ìªº DB
-.AddDefaultTokenProviders();              // ±Ò¥Î Email ÅçÃÒ token ¥\¯à
+    options.SignIn.RequireConfirmedEmail = true;   // å¿…é ˆé©—è­‰ Email æ‰èƒ½ç™»å…¥
+    options.Password.RequireDigit = true;           // å¯†ç¢¼éœ€è¦æ•¸å­—
+    options.Password.RequiredLength = 8;            // å¯†ç¢¼æœ€å°‘ 8 ç¢¼
+    options.Password.RequireUppercase = false;      // ä¸å¼·åˆ¶å¤§å¯«
+    options.Password.RequireNonAlphanumeric = false;// ä¸å¼·åˆ¶ç‰¹æ®Šç¬¦è™Ÿ
 
-// §i¶Dµ{¦¡¡G¡u·í¦³¤H»İ­n IEmailService¡A´Nµ¹¥L EmailService¡v
-// Scoped = ¨C­Ó HTTP ½Ğ¨D«Ø¥ß¤@­Ó·sªº¹êÅé
+    // V-07 ä¿®å¾©ï¼šåŸæœ¬ AccountController.Login å‘¼å« PasswordSignInAsync æ™‚
+    // æ˜ç¢ºé—œé–‰äº† lockoutOnFailureï¼Œé€™è£¡çš„è¨­å®šå½¢åŒè™›è¨­ã€‚ç¾åœ¨å…©é‚Šä¸€èµ·æ‰“é–‹ï¼š
+    // é€£çºŒæ‰“éŒ¯ 5 æ¬¡å¯†ç¢¼é–å¸³è™Ÿ 15 åˆ†é˜ï¼Œæ“‹æ‰ç·šä¸Šæš´åŠ›ç ´è§£ã€‚
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+    options.Lockout.AllowedForNewUsers = true;
+})
+.AddEntityFrameworkStores<AppDbContext>() // Identity çš„è³‡æ–™å­˜åˆ°æˆ‘å€‘çš„ DB
+.AddDefaultTokenProviders();              // å•Ÿç”¨ Email é©—è­‰ token åŠŸèƒ½
+
+// å‘Šè¨´ç¨‹å¼ï¼šã€Œç•¶æœ‰äººéœ€è¦ IEmailServiceï¼Œå°±çµ¦ä»– EmailServiceã€
+// Scoped = æ¯å€‹ HTTP è«‹æ±‚å»ºç«‹ä¸€å€‹æ–°çš„å¯¦é«”
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IImageService, ImageService>();
 
-// ±Ò¥Î Session
-// Session »İ­n MemoryCache ¨ÓÀx¦s¸ê®Æ
+// å•Ÿç”¨ Session
+// Session éœ€è¦ MemoryCache ä¾†å„²å­˜è³‡æ–™
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
-    options.IdleTimeout = TimeSpan.FromMinutes(30); // 30¤ÀÄÁ¨S°Ê§@´N¹L´Á
-    options.Cookie.HttpOnly = true; // ¥u¦³¦øªA¾¹¯àÅª¨ú Cookie¡A¨¾¤î JS ÅÑ¨ú
-    options.Cookie.IsEssential = true; // ¥²­n Cookie¡A¤£»İ­n¥Î¤á¦P·N
+    options.IdleTimeout = TimeSpan.FromMinutes(30); // 30åˆ†é˜æ²’å‹•ä½œå°±éæœŸ
+    options.Cookie.HttpOnly = true; // åªæœ‰ä¼ºæœå™¨èƒ½è®€å– Cookieï¼Œé˜²æ­¢ JS ç«Šå–
+    options.Cookie.IsEssential = true; // å¿…è¦ Cookieï¼Œä¸éœ€è¦ç”¨æˆ¶åŒæ„
 });
 
-// µù¥U CartService
+// è¨»å†Š CartService
 builder.Services.AddScoped<ICartService, CartService>();
 
-// ³]©w¥ş°ì±ÂÅv¡G¹w³]»İ­nµn¤J¤~¯à¨Ï¥Î
-// ¦ı¦³ [AllowAnonymous] ªº Action ¤£¨ü­­¨î
+// V-07 ä¿®å¾©ï¼šLogin / Register åŠ é€Ÿç‡é™åˆ¶ï¼Œé˜²æ­¢å¸³è™Ÿè¢«æ‹¿å»å¤§é‡å˜—è©¦å¯†ç¢¼æˆ–å¤§é‡çŒè¨»å†Šå¯„ä¿¡ã€‚
+// ç”¨ IP ç•¶ partition keyï¼ŒåŒä¸€å€‹ IP æ¯åˆ†é˜æœ€å¤š 5 æ¬¡è«‹æ±‚ï¼Œè¶…éçš„ç›´æ¥æ’éšŠ 0ï¼ˆç«‹åˆ»æ‹’çµ•ï¼‰ã€‚
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddFixedWindowLimiter("AuthPolicy", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 5;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueLimit = 0;
+    });
+});
+
+// è¨­å®šå…¨åŸŸæˆæ¬Šï¼šé è¨­éœ€è¦ç™»å…¥æ‰èƒ½ä½¿ç”¨
+// ä½†æœ‰ [AllowAnonymous] çš„ Action ä¸å—é™åˆ¶
 builder.Services.AddControllersWithViews(options =>
 {
     var policy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
@@ -53,9 +75,9 @@ builder.Services.AddControllersWithViews(options =>
 
 var app = builder.Build();
 
-// ¡õ ¥H¤U¬O¡u¤¤¤¶³nÅé¡]Middleware¡^¡v³]©w
-//   ´N¹³À\ÆUªºSOP¡G«È¤H¶i¨Ó ¡÷ ½T»{¨­¥÷ ¡÷ ±a¦ì ¡÷ ÂIÀ\
-//   ¶¶§Ç«Ü­«­n¡A¤£¯à¶Ã´«¡I
+// â†“ ä»¥ä¸‹æ˜¯ã€Œä¸­ä»‹è»Ÿé«”ï¼ˆMiddlewareï¼‰ã€è¨­å®š
+//   å°±åƒé¤å»³çš„SOPï¼šå®¢äººé€²ä¾† â†’ ç¢ºèªèº«ä»½ â†’ å¸¶ä½ â†’ é»é¤
+//   é †åºå¾ˆé‡è¦ï¼Œä¸èƒ½äº‚æ›ï¼
 
 if (!app.Environment.IsDevelopment())
 {
@@ -63,17 +85,36 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection(); // ±j¨î https
-app.UseStaticFiles();      // ¤¹³\Åª¨ú wwwroot ¸Ìªº¹Ï¤ù¡BCSS¡BJS
-app.UseRouting();          // ±Ò¥Îºô§}¸ô¥Ñ¡]¨M©w­ş­Óºô§}¹ïÀ³­ş­ÓController¡^
-app.UseSession(); // ±Ò¥Î Session ¤¤¤¶³nÅé
-app.UseAuthentication();   // ±Ò¥Î¨­¥÷ÅçÃÒ¡]§A¬O½Ö¡H¡^
-app.UseAuthorization();    // ±Ò¥ÎÅv­­±±¨î¡]§A¯à°µ¤°»ò¡H¡^
+app.UseHttpsRedirection(); // å¼·åˆ¶ https
 
-// ¡õ ¹w³]¸ô¥Ñ³W«h¡Gºô§} ¡÷ Controller ¡÷ Action¡]¤èªk¡^
+// V-15 ä¿®å¾©ï¼šåŸæœ¬å®Œå…¨æ²’æœ‰å®‰å…¨æ¨™é ­ã€‚é€™å¹¾å€‹ header éƒ½æ˜¯å…è²»çš„ç¸±æ·±é˜²ç¦¦â€”â€”
+// å°±ç®—å“ªå¤©çœŸçš„å‡ºç¾å„²å­˜å‹ XSSï¼ˆä¾‹å¦‚ V-06 çš„åœ–ç‰‡ä¸Šå‚³æ¼æ´ï¼‰ï¼ŒCSP ä¹Ÿèƒ½å¤§å¹…é™åˆ¶å®ƒèƒ½åšçš„äº‹ã€‚
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";           // ç€è¦½å™¨ä¸è¦è‡ªå·±çŒœ MIME type
+    headers["X-Frame-Options"] = "DENY";                      // ä¸èƒ½è¢«å…¶ä»–ç¶²ç«™ç”¨ <iframe> åŒ…ä½ï¼ˆé˜² Clickjackingï¼‰
+    headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    headers["Content-Security-Policy"] =
+        "default-src 'self'; " +
+        "script-src 'self'; " +
+        "style-src 'self' 'unsafe-inline'; " + // Bootstrap/å…§åµŒ <style> éœ€è¦ï¼Œä¹‹å¾Œå‰ç«¯é‡æ§‹å¯ä»¥æ‹¿æ‰
+        "img-src 'self' data:; " +
+        "frame-ancestors 'none'";
+    await next();
+});
+
+app.UseStaticFiles();      // å…è¨±è®€å– wwwroot è£¡çš„åœ–ç‰‡ã€CSSã€JS
+app.UseRouting();          // å•Ÿç”¨ç¶²å€è·¯ç”±ï¼ˆæ±ºå®šå“ªå€‹ç¶²å€å°æ‡‰å“ªå€‹Controllerï¼‰
+app.UseRateLimiter();      // V-07 ä¿®å¾©ï¼šå¥—ç”¨ä¸Šé¢è¨»å†Šçš„ AuthPolicy
+app.UseSession(); // å•Ÿç”¨ Session ä¸­ä»‹è»Ÿé«”
+app.UseAuthentication();   // å•Ÿç”¨èº«ä»½é©—è­‰ï¼ˆä½ æ˜¯èª°ï¼Ÿï¼‰
+app.UseAuthorization();    // å•Ÿç”¨æ¬Šé™æ§åˆ¶ï¼ˆä½ èƒ½åšä»€éº¼ï¼Ÿï¼‰
+
+// â†“ é è¨­è·¯ç”±è¦å‰‡ï¼šç¶²å€ â†’ Controller â†’ Actionï¼ˆæ–¹æ³•ï¼‰
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
-//  ¨S¥´ºô§} ¡÷ ¹w³]¥h HomeController ªº Index ¤èªk
+//  æ²’æ‰“ç¶²å€ â†’ é è¨­å» HomeController çš„ Index æ–¹æ³•
 
 app.Run();

@@ -70,7 +70,7 @@
                             <td>
                                 @* 不同狀態顯示不同顏色 *@
                                 <span class="badge @GetStatusBadgeClass(order.Status)">
-                                    @order.Status
+                                    @order.Status.GetDisplayName()
                                 </span>
                             </td>
                             <td>@order.CreatedAt.ToString("MM/dd HH:mm")</td>
@@ -91,14 +91,14 @@
 @functions {
     string GetStatusBadgeClass(Yustore.Enums.OrderStatus status) => status switch
     {
-        OrderStatus.待付款 => "bg-secondary",
-        OrderStatus.已付款 => "bg-info",
-        OrderStatus.備餐中 => "bg-primary",
-        OrderStatus.待取餐 => "bg-warning text-dark",
-        OrderStatus.外送中 => "bg-warning text-dark",
-        OrderStatus.已送達 => "bg-success",
-        OrderStatus.完成 => "bg-success",
-        OrderStatus.已取消 => "bg-danger",
+        OrderStatus.PendingPayment => "bg-secondary",
+        OrderStatus.Paid => "bg-info",
+        OrderStatus.Preparing => "bg-primary",
+        OrderStatus.ReadyForPickup => "bg-warning text-dark",
+        OrderStatus.OutForDelivery => "bg-warning text-dark",
+        OrderStatus.Delivered => "bg-success",
+        OrderStatus.Completed => "bg-success",
+        OrderStatus.Cancelled => "bg-danger",
         _ => "bg-secondary"
     };
 }

@@ -15,7 +15,7 @@
                     <div class="text-center mb-4">
                         <h5>你正在評分</h5>
                         <h3>@Model.TargetUserName</h3>
-                        <span class="badge bg-secondary">@Model.TargetType</span>
+                        <span class="badge bg-secondary">@Model.TargetType.GetDisplayName()</span>
                         <p class="text-muted small mt-1">
                             訂單：@Model.OrderNumber
                         </p>
